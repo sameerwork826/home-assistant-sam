@@ -14,6 +14,8 @@ services:
         value: development-secret-token
       - key: ALEXA_VERIFY_SIGNATURE
         value: "false"
+      - key: ALEXA_SKILL_ID
+        value: amzn1.ask.skill.e0eea847-602a-4ce9-bcb5-bb89b07736fc
       - key: DASHBOARD_USERNAME
         value: admin
       - key: DASHBOARD_PASSWORD
