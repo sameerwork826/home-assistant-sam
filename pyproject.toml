@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "alexa-windows-controller"
-version = "1.0.0"
-description = "Secure Alexa-to-Windows voice command execution system"
+version = "1.1.0"
+description = "Secure Alexa-to-Windows voice command execution system with GUI & TriggerCMD alternative"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -17,6 +17,9 @@ dependencies = [
     "httpx>=0.27.0",
     "websockets>=12.0",
     "python-dotenv>=1.0.0",
+    "customtkinter>=6.0.0",
+    "pystray>=0.19.5",
+    "pillow>=10.0.0",
 ]
 
 [project.optional-dependencies]

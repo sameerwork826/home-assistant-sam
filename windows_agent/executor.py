@@ -221,6 +221,27 @@ class WindowsExecutor:
             )
         )
 
+        # 11. Run Custom TriggerCMD-Style Command
+        registry.register(
+            CommandDefinition(
+                command_id="run_custom",
+                name="Run Custom Command",
+                description="Executes a user-defined custom command or script by trigger name",
+                intent_mapping="RunCustomCommandIntent",
+                risk_level=RiskLevel.MEDIUM,
+                timeout_seconds=15.0,
+                confirmation_required=False,
+                required_parameters=["command_name"],
+                allowed_parameters=["command_name"],
+                expected_result="Custom command executed",
+                handler=self.execute_run_custom,
+            )
+        )
+
+        # Also dynamically register all individual custom commands loaded from custom_commands.json
+        from windows_agent.custom_commands import custom_command_manager
+        custom_command_manager.register_all_into_registry()
+
     # --------------------------------------------------------------------------
     # Command Implementations
     # --------------------------------------------------------------------------
@@ -494,6 +515,12 @@ class WindowsExecutor:
             message=msg,
             data={"last_result": self.last_result.model_dump()},
         )
+
+    def execute_run_custom(self, params: Dict[str, Any]) -> CommandExecutionResult:
+        """Executes a custom user-defined command by trigger name."""
+        from windows_agent.custom_commands import custom_command_manager
+        cmd_name = str(params.get("command_name", "")).strip()
+        return custom_command_manager.execute(cmd_name, params)
 
     # --------------------------------------------------------------------------
     # Central Dispatcher

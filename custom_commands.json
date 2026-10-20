@@ -1,0 +1,42 @@
+[
+  {
+    "trigger_name": "notepad",
+    "command_line": "notepad.exe",
+    "description": "Launches Windows Notepad",
+    "confirmation_required": false,
+    "enabled": true,
+    "created_at": 1792506192.011065
+  },
+  {
+    "trigger_name": "calculator",
+    "command_line": "calc.exe",
+    "description": "Launches Windows Calculator",
+    "confirmation_required": false,
+    "enabled": true,
+    "created_at": 1792506192.0110703
+  },
+  {
+    "trigger_name": "paint",
+    "command_line": "mspaint.exe",
+    "description": "Launches Microsoft Paint",
+    "confirmation_required": false,
+    "enabled": true,
+    "created_at": 1792506192.0110722
+  },
+  {
+    "trigger_name": "task_manager",
+    "command_line": "taskmgr.exe",
+    "description": "Opens Windows Task Manager",
+    "confirmation_required": false,
+    "enabled": true,
+    "created_at": 1792506192.011074
+  },
+  {
+    "trigger_name": "file_explorer",
+    "command_line": "explorer.exe",
+    "description": "Opens Windows File Explorer",
+    "confirmation_required": false,
+    "enabled": true,
+    "created_at": 1792506192.0110753
+  }
+]

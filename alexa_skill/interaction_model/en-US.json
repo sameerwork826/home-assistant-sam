@@ -227,6 +227,25 @@
             "no thanks",
             "stop action"
           ]
+        },
+        {
+          "name": "RunCustomCommandIntent",
+          "slots": [
+            {
+              "name": "CommandName",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "run {CommandName}",
+            "trigger {CommandName}",
+            "execute {CommandName}",
+            "start {CommandName}",
+            "launch {CommandName}",
+            "run the command {CommandName}",
+            "run command {CommandName}",
+            "trigger command {CommandName}"
+          ]
         }
       ]
     }

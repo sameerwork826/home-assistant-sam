@@ -48,6 +48,16 @@ def parse_arguments() -> argparse.Namespace:
         action="store_true",
         help="Print current Windows session and system metrics and exit",
     )
+    parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="Launch the modern Windows 11 desktop GUI application with TriggerCMD command manager",
+    )
+    parser.add_argument(
+        "--cli",
+        action="store_true",
+        help="Run in headless terminal background mode",
+    )
     return parser.parse_args()
 
 
@@ -153,6 +163,11 @@ def main() -> None:
         if result.error_category:
             print(f"Error Category: {result.error_category}")
         sys.exit(0 if result.success else 1)
+
+    if args.gui:
+        from windows_agent.gui import launch_gui
+        launch_gui()
+        return
 
     asyncio.run(run_agent())
 

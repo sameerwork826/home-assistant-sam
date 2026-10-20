@@ -225,6 +225,19 @@ class AlexaSkillHandler:
         if intent_name == "CommandStatusIntent":
             return await self._dispatch_and_respond("command_status", {})
 
+        if intent_name == "RunCustomCommandIntent":
+            cmd_slot = slots.get("CommandName") or slots.get("command_name") or {}
+            cmd_name = cmd_slot.get("value")
+            if not cmd_name:
+                return build_alexa_response(
+                    "Which custom command would you like me to run?",
+                    reprompt_text="Which command should I run on your computer?",
+                    should_end_session=False,
+                )
+            return await self._dispatch_and_respond(
+                "run_custom", {"command_name": cmd_name}
+            )
+
         return build_alexa_response(
             f"Command for intent '{intent_name}' is not recognized.",
             should_end_session=True,
