@@ -272,6 +272,7 @@ async def list_agents():
 async def agent_websocket_endpoint(
     websocket: WebSocket,
     token: Optional[str] = Query(None),
+    agent_id_param: Optional[str] = Query(None, alias="agent_id"),
     config: CloudConfig = Depends(get_cloud_config),
 ):
     """
@@ -288,7 +289,7 @@ async def agent_websocket_endpoint(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    agent_id = websocket.headers.get("x-agent-id", "windows-laptop-primary")
+    agent_id = agent_id_param or websocket.headers.get("x-agent-id", "windows-laptop-primary")
     await websocket.accept()
 
     db, qm, broker, _ = get_services()

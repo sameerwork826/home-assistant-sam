@@ -46,5 +46,21 @@
     "confirmation_required": false,
     "enabled": true,
     "created_at": 1792506936.94374
+  },
+  {
+    "trigger_name": "my_starhot",
+    "command_line": "https://www.hotstart.com",
+    "description": "Launches Jio Hotstar",
+    "confirmation_required": false,
+    "enabled": true,
+    "created_at": 1792508031.5022733
+  },
+  {
+    "trigger_name": "open netlfix",
+    "command_line": "https://netflix.com",
+    "description": "opens netflix",
+    "confirmation_required": false,
+    "enabled": true,
+    "created_at": 1792508077.253014
   }
 ]

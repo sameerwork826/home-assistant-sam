@@ -135,21 +135,39 @@ class AgentApiClient:
 
     async def connect_and_listen_ws(self) -> None:
         """Connects to the broker WebSocket and listens for incoming commands."""
-        # Convert http/https broker url to ws/wss if needed
-        ws_url = self.config.broker_ws_url
-        extra_headers = [
+        import inspect
+        import urllib.parse
+
+        ws_url = self.config.broker_ws_url.rstrip("/")
+
+        # Append query params as reliable universal fallback across proxies / tunnels
+        delim = "&" if "?" in ws_url else "?"
+        query_params = urllib.parse.urlencode({
+            "token": self.config.auth_token,
+            "agent_id": self.config.agent_id,
+        })
+        connect_url = f"{ws_url}{delim}{query_params}"
+
+        headers = [
             ("Authorization", f"Bearer {self.config.auth_token}"),
             ("X-Agent-ID", self.config.agent_id),
         ]
 
         logger.info(f"Connecting to broker at: {ws_url}")
-        async with websockets.connect(
-            ws_url,
-            extra_headers=extra_headers,
-            ping_interval=20,
-            ping_timeout=20,
-            close_timeout=5,
-        ) as ws:
+
+        # Detect websockets library parameter compatibility
+        sig = inspect.signature(websockets.connect)
+        connect_kwargs: Dict[str, Any] = {
+            "ping_interval": 20,
+            "ping_timeout": 20,
+            "close_timeout": 5,
+        }
+        if "additional_headers" in sig.parameters:
+            connect_kwargs["additional_headers"] = headers
+        elif "extra_headers" in sig.parameters:
+            connect_kwargs["extra_headers"] = headers
+
+        async with websockets.connect(connect_url, **connect_kwargs) as ws:
             self.ws_connection = ws
             self._reconnect_delay = 1.0  # Reset backoff on successful connection
             logger.info("Connected successfully to Cloud Command Broker via WebSocket.")

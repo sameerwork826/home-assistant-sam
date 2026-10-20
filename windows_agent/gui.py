@@ -858,35 +858,193 @@ class WindowsAgentGUI(ctk.CTk):
     # --------------------------------------------------------------------------
 
     def _build_settings_tab(self) -> None:
-        frame = ctk.CTkFrame(self.tab_settings, fg_color="transparent")
-        frame.pack(fill="both", expand=True, padx=20, pady=16)
+        scroll = ctk.CTkScrollableFrame(self.tab_settings, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=20, pady=16)
+
+        # 1. Broker Connection & Tunnel Manager Card
+        broker_card = ctk.CTkFrame(scroll, fg_color="#0b0f19", corner_radius=10, border_width=1, border_color="#1f293d")
+        broker_card.pack(fill="x", pady=(0, 16))
 
         ctk.CTkLabel(
-            frame,
-            text="Agent Configuration & Connection Settings",
-            font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold"),
+            broker_card,
+            text="📡 Cloud Broker & Tunnel Configuration",
+            font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
             text_color="#f8fafc",
-        ).pack(anchor="w", pady=(0, 14))
+        ).pack(anchor="w", padx=16, pady=(14, 6))
+
+        ctk.CTkLabel(
+            broker_card,
+            text="Connect directly via Localhost (http://localhost:8000) or enter your Cloudflare Tunnel URL (https://xxxx.trycloudflare.com).",
+            font=ctk.CTkFont(size=12),
+            text_color="#94a3b8",
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", padx=16, pady=(0, 12))
+
+        # Input row
+        url_row = ctk.CTkFrame(broker_card, fg_color="transparent")
+        url_row.pack(fill="x", padx=16, pady=(0, 12))
+
+        self.entry_broker_url = ctk.CTkEntry(
+            url_row,
+            placeholder_text="e.g. http://localhost:8000 or https://your-tunnel.trycloudflare.com",
+            font=ctk.CTkFont(size=13),
+            fg_color="#151e2e",
+            border_color="#2563eb",
+            height=36,
+        )
+        self.entry_broker_url.insert(0, self.config.broker_api_url)
+        self.entry_broker_url.pack(side="left", fill="x", expand=True, padx=(0, 10))
+
+        btn_apply_url = ctk.CTkButton(
+            url_row,
+            text="Apply & Reconnect",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#2563eb",
+            hover_color="#1d4ed8",
+            height=36,
+            command=self._apply_broker_url,
+        )
+        btn_apply_url.pack(side="left", padx=(0, 8))
+
+        btn_reset_local = ctk.CTkButton(
+            url_row,
+            text="Reset to Localhost",
+            font=ctk.CTkFont(size=12),
+            fg_color="#1e293b",
+            hover_color="#334155",
+            height=36,
+            command=self._reset_broker_to_localhost,
+        )
+        btn_reset_local.pack(side="left")
+
+        # 2. Alexa Skill Webhook Endpoint Card
+        alexa_card = ctk.CTkFrame(scroll, fg_color="#0b0f19", corner_radius=10, border_width=1, border_color="#1f293d")
+        alexa_card.pack(fill="x", pady=(0, 16))
+
+        ctk.CTkLabel(
+            alexa_card,
+            text="🎙️ Alexa Developer Console Webhook Endpoint",
+            font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
+            text_color="#f8fafc",
+        ).pack(anchor="w", padx=16, pady=(14, 4))
+
+        ctk.CTkLabel(
+            alexa_card,
+            text="Copy this HTTPS URL and paste it into the Alexa Developer Console under 'Endpoint > HTTPS > Default Region':",
+            font=ctk.CTkFont(size=12),
+            text_color="#94a3b8",
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", padx=16, pady=(0, 10))
+
+        endpoint_row = ctk.CTkFrame(alexa_card, fg_color="#151e2e", corner_radius=8, border_width=1, border_color="#2563eb")
+        endpoint_row.pack(fill="x", padx=16, pady=(0, 14))
+
+        self.lbl_alexa_webhook = ctk.CTkLabel(
+            endpoint_row,
+            text=f"{self.config.broker_api_url.rstrip('/')}/alexa",
+            font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
+            text_color="#38bdf8",
+            anchor="w",
+        )
+        self.lbl_alexa_webhook.pack(side="left", padx=14, pady=10, fill="x", expand=True)
+
+        btn_copy_endpoint = ctk.CTkButton(
+            endpoint_row,
+            text="📋 Copy Endpoint",
+            width=130,
+            height=32,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#059669",
+            hover_color="#047857",
+            command=self._copy_alexa_webhook,
+        )
+        btn_copy_endpoint.pack(side="right", padx=10, pady=6)
+
+        # 3. System & Agent Configuration Details
+        details_card = ctk.CTkFrame(scroll, fg_color="#0b0f19", corner_radius=10, border_width=1, border_color="#1f293d")
+        details_card.pack(fill="x", pady=(0, 16))
+
+        ctk.CTkLabel(
+            details_card,
+            text="⚙️ Agent Environment & Runtime Settings",
+            font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
+            text_color="#f8fafc",
+        ).pack(anchor="w", padx=16, pady=(14, 10))
 
         settings = [
             ("Agent ID", self.config.agent_id),
-            ("Broker REST URL", self.config.broker_api_url),
-            ("WebSocket URL", self.config.broker_ws_url),
+            ("Active WebSocket URL", self.config.broker_ws_url),
             ("Google Chrome Path", self.config.chrome_path or "Auto-discovered"),
             ("VS Code Path", self.config.vscode_path or "Auto-discovered"),
-            ("Approved Websites", ", ".join(self.config.approved_websites.keys())),
+            ("Approved Built-in Sites", ", ".join(self.config.approved_websites.keys())),
             ("Shutdown Safety Buffer", f"{self.config.shutdown_delay_seconds} seconds"),
         ]
 
         for label, val in settings:
-            row = ctk.CTkFrame(frame, fg_color="#0b0f19", corner_radius=8, border_width=1, border_color="#1f293d")
-            row.pack(fill="x", pady=4)
+            row = ctk.CTkFrame(details_card, fg_color="#151e2e", corner_radius=6)
+            row.pack(fill="x", padx=16, pady=3)
             ctk.CTkLabel(
-                row, text=f"{label}:", font=ctk.CTkFont(weight="bold"), width=180, anchor="w"
-            ).pack(side="left", padx=14, pady=10)
+                row, text=f"{label}:", font=ctk.CTkFont(weight="bold", size=12), width=180, anchor="w"
+            ).pack(side="left", padx=12, pady=8)
             ctk.CTkLabel(
-                row, text=str(val), text_color="#38bdf8", anchor="w"
-            ).pack(side="left", padx=14, pady=10)
+                row, text=str(val), text_color="#38bdf8", anchor="w", font=ctk.CTkFont(size=12)
+            ).pack(side="left", padx=12, pady=8)
+
+    def _apply_broker_url(self) -> None:
+        """Applies a newly entered Broker URL, deduces WebSocket URL, and reconnects."""
+        raw = self.entry_broker_url.get().strip()
+        if not raw:
+            return
+
+        if not raw.startswith(("http://", "https://", "ws://", "wss://")):
+            raw = "https://" + raw
+
+        if raw.startswith("ws://"):
+            ws_url = raw
+            api_url = "http://" + raw[5:].split("/ws/agent")[0]
+        elif raw.startswith("wss://"):
+            ws_url = raw
+            api_url = "https://" + raw[6:].split("/ws/agent")[0]
+        elif raw.startswith("https://"):
+            api_url = raw.rstrip("/")
+            ws_url = f"wss://{raw[8:].rstrip('/')}/ws/agent"
+        else:
+            api_url = raw.rstrip("/")
+            ws_url = f"ws://{raw[7:].rstrip('/')}/ws/agent"
+
+        self.config.broker_api_url = api_url
+        self.config.broker_ws_url = ws_url
+        self.lbl_broker_url.configure(text=f"📡 Broker: {api_url}")
+        self.lbl_alexa_webhook.configure(text=f"{api_url}/alexa")
+
+        # Disconnect current connection so background loop reconnects with new URL immediately
+        if self.bg_loop and self.bg_loop.is_running() and self.api_client.ws_connection:
+            try:
+                asyncio.run_coroutine_threadsafe(self.api_client.ws_connection.close(), self.bg_loop)
+            except Exception:
+                pass
+
+        self._log_message(f"Broker connection updated to: {api_url} (WS: {ws_url})")
+
+    def _reset_broker_to_localhost(self) -> None:
+        """Resets broker connection back to local development server."""
+        self.entry_broker_url.delete(0, tk.END)
+        self.entry_broker_url.insert(0, "http://localhost:8000")
+        self._apply_broker_url()
+
+    def _copy_alexa_webhook(self) -> None:
+        """Copies the configured Alexa Webhook URL to the clipboard."""
+        endpoint = self.lbl_alexa_webhook.cget("text")
+        self.clipboard_clear()
+        self.clipboard_append(endpoint)
+        self._log_message(f"Copied Alexa Endpoint to clipboard: {endpoint}")
+        messagebox.showinfo(
+            "Copied to Clipboard",
+            f"Alexa Endpoint URL copied:\n\n{endpoint}\n\nPaste this in the Alexa Developer Console under 'Endpoint > HTTPS > Default Region'.",
+            parent=self,
+        )
 
     # --------------------------------------------------------------------------
     # Background Worker & Lifecycle
@@ -920,6 +1078,31 @@ class WindowsAgentGUI(ctk.CTk):
                 text="○ WAITING FOR BROKER",
                 fg_color="#b45309",
             )
+
+        # Check local broker port state every 2 seconds
+        if not hasattr(self, "_port_check_counter"):
+            self._port_check_counter = 0
+        self._port_check_counter += 1
+        if self._port_check_counter % 2 == 0:
+            import socket
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.settimeout(0.2)
+                    port_open = (s.connect_ex(('127.0.0.1', 8000)) == 0)
+                if port_open:
+                    self.btn_local_broker.configure(
+                        text="✓ Broker Online (8000)",
+                        fg_color="#059669",
+                        hover_color="#047857",
+                    )
+                elif self.local_broker_server is None:
+                    self.btn_local_broker.configure(
+                        text="⚡ Start Local Broker",
+                        fg_color="#2563eb",
+                        hover_color="#1d4ed8",
+                    )
+            except Exception:
+                pass
 
         self.after(1000, self._start_periodic_ui_refresh)
 
