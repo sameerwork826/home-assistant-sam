@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: alexa-windows-broker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn cloud.app:app --host 0.0.0.0 --port $PORT
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: AGENT_AUTH_TOKEN
+        value: development-secret-token
+      - key: ALEXA_VERIFY_SIGNATURE
+        value: "false"
+      - key: DASHBOARD_USERNAME
+        value: admin
+      - key: DASHBOARD_PASSWORD
+        generateValue: true
