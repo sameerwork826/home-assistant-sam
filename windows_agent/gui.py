@@ -54,23 +54,38 @@ def get_ui_settings_path() -> Path:
     return Path("./ui_settings.json")
 
 
-def load_ui_theme() -> str:
+def load_ui_settings() -> Dict[str, Any]:
     path = get_ui_settings_path()
+    defaults = {
+        "appearance_mode": "Light",
+        "broker_api_url": "https://alexa-windows-broker.onrender.com",
+        "broker_ws_url": "wss://alexa-windows-broker.onrender.com/ws/agent",
+    }
     if path.exists():
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            return data.get("appearance_mode", "Light")
+            defaults.update(data)
         except Exception:
             pass
-    return "Light"
+    return defaults
+
+
+def save_ui_settings(updates: Dict[str, Any]) -> None:
+    try:
+        path = get_ui_settings_path()
+        current = load_ui_settings()
+        current.update(updates)
+        path.write_text(json.dumps(current, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def load_ui_theme() -> str:
+    return load_ui_settings().get("appearance_mode", "Light")
 
 
 def save_ui_theme(mode: str) -> None:
-    try:
-        path = get_ui_settings_path()
-        path.write_text(json.dumps({"appearance_mode": mode}, indent=2), encoding="utf-8")
-    except Exception:
-        pass
+    save_ui_settings({"appearance_mode": mode})
 
 
 # Dynamic tuple colors: ("light_mode_color", "dark_mode_color")
@@ -430,6 +445,14 @@ class WindowsAgentGUI(ctk.CTk):
     def __init__(self, config: Optional[AgentConfig] = None, start_minimized: bool = False) -> None:
         super().__init__()
         self.config = config or get_agent_config()
+
+        # Prioritize broker URLs saved in ui_settings.json
+        ui_cfg = load_ui_settings()
+        if ui_cfg.get("broker_api_url"):
+            self.config.broker_api_url = ui_cfg["broker_api_url"]
+        if ui_cfg.get("broker_ws_url"):
+            self.config.broker_ws_url = ui_cfg["broker_ws_url"]
+
         self.executor = WindowsExecutor(self.config)
         self.api_client = AgentApiClient(self.config, self.executor)
 
@@ -594,6 +617,32 @@ class WindowsAgentGUI(ctk.CTk):
         )
         self.lbl_uptime.pack(side="left")
 
+        # Quick Copy buttons in header bar (visible everywhere)
+        header_actions = ctk.CTkFrame(metrics_bar, fg_color="transparent")
+        header_actions.pack(side="right")
+
+        btn_hdr_copy_endpoint = ctk.CTkButton(
+            header_actions,
+            text="📋 Copy Alexa Webhook",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color="#059669",
+            hover_color="#047857",
+            height=26,
+            command=self._copy_alexa_webhook,
+        )
+        btn_hdr_copy_endpoint.pack(side="left", padx=(0, 8))
+
+        btn_hdr_copy_model = ctk.CTkButton(
+            header_actions,
+            text="📋 Copy Model JSON",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color="#0284c7",
+            hover_color="#0369a1",
+            height=26,
+            command=self._copy_interaction_model_json,
+        )
+        btn_hdr_copy_model.pack(side="left")
+
         # Main Tabview
         self.tabview = ctk.CTkTabview(
             self,
@@ -711,8 +760,92 @@ class WindowsAgentGUI(ctk.CTk):
     # --------------------------------------------------------------------------
 
     def _build_commands_tab(self) -> None:
+        # 🎙️ Alexa Developer Console Quick Integration Banner
+        alexa_banner = ctk.CTkFrame(
+            self.tab_commands,
+            fg_color=THEME_COLORS["card_bg"],
+            corner_radius=10,
+            border_width=1,
+            border_color=THEME_COLORS["card_border"],
+        )
+        alexa_banner.pack(fill="x", padx=12, pady=(10, 6))
+
+        banner_top = ctk.CTkFrame(alexa_banner, fg_color="transparent")
+        banner_top.pack(fill="x", padx=14, pady=(10, 4))
+
+        ctk.CTkLabel(
+            banner_top,
+            text="🎙️ Alexa Developer Console Setup & Cloud Webhook",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color=THEME_COLORS["brand_title"],
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            banner_top,
+            text="● Render Cloud Active",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color="#059669",
+        ).pack(side="right")
+
+        banner_body = ctk.CTkFrame(alexa_banner, fg_color="transparent")
+        banner_body.pack(fill="x", padx=14, pady=(0, 10))
+
+        # Endpoint display box
+        ep_box = ctk.CTkFrame(banner_body, fg_color=THEME_COLORS["code_box_bg"], corner_radius=6)
+        ep_box.pack(side="left", fill="x", expand=True, padx=(0, 10))
+
+        ctk.CTkLabel(
+            ep_box,
+            text="Webhook URL: ",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=THEME_COLORS["text_secondary"],
+        ).pack(side="left", padx=(10, 2), pady=6)
+
+        self.lbl_quick_webhook = ctk.CTkLabel(
+            ep_box,
+            text=f"{self.config.broker_api_url.rstrip('/')}/alexa",
+            font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
+            text_color="#0284c7",
+        )
+        self.lbl_quick_webhook.pack(side="left", padx=(0, 10), pady=6)
+
+        # Action buttons
+        btn_copy_ep = ctk.CTkButton(
+            banner_body,
+            text="📋 Copy Webhook URL",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color="#059669",
+            hover_color="#047857",
+            height=30,
+            command=self._copy_alexa_webhook,
+        )
+        btn_copy_ep.pack(side="left", padx=(0, 8))
+
+        btn_copy_mod = ctk.CTkButton(
+            banner_body,
+            text="📋 Copy Alexa Model (JSON)",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color="#0284c7",
+            hover_color="#0369a1",
+            height=30,
+            command=self._copy_interaction_model_json,
+        )
+        btn_copy_mod.pack(side="left", padx=(0, 8))
+
+        btn_sync = ctk.CTkButton(
+            banner_body,
+            text="🔄 Sync Triggers",
+            font=ctk.CTkFont(size=11),
+            fg_color=THEME_COLORS["btn_secondary_bg"],
+            hover_color=THEME_COLORS["btn_secondary_hover"],
+            text_color=THEME_COLORS["btn_secondary_text"],
+            height=30,
+            command=self._sync_model_now,
+        )
+        btn_sync.pack(side="left")
+
         action_bar = ctk.CTkFrame(self.tab_commands, fg_color="transparent")
-        action_bar.pack(fill="x", padx=12, pady=(12, 10))
+        action_bar.pack(fill="x", padx=12, pady=(4, 10))
 
         # Search Box with Debounce
         self.search_entry = ctk.CTkEntry(
@@ -1207,6 +1340,17 @@ class WindowsAgentGUI(ctk.CTk):
         )
         btn_apply_url.pack(side="left", padx=(0, 8))
 
+        btn_reset_render = ctk.CTkButton(
+            url_row,
+            text="☁️ Set to Render Cloud",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#059669",
+            hover_color="#047857",
+            height=36,
+            command=self._reset_broker_to_render,
+        )
+        btn_reset_render.pack(side="left", padx=(0, 8))
+
         btn_reset_local = ctk.CTkButton(
             url_row,
             text="Reset to Localhost",
@@ -1419,8 +1563,13 @@ class WindowsAgentGUI(ctk.CTk):
 
         self.config.broker_api_url = api_url
         self.config.broker_ws_url = ws_url
+        save_ui_settings({"broker_api_url": api_url, "broker_ws_url": ws_url})
+
         self.lbl_broker_url.configure(text=f"📡 Broker: {api_url}")
-        self.lbl_alexa_webhook.configure(text=f"{api_url}/alexa")
+        if hasattr(self, "lbl_alexa_webhook"):
+            self.lbl_alexa_webhook.configure(text=f"{api_url}/alexa")
+        if hasattr(self, "lbl_quick_webhook"):
+            self.lbl_quick_webhook.configure(text=f"{api_url}/alexa")
 
         if self.bg_loop and self.bg_loop.is_running() and self.api_client.ws_connection:
             try:
@@ -1430,6 +1579,17 @@ class WindowsAgentGUI(ctk.CTk):
 
         self._log_message(f"Broker connection updated to: {api_url} (WS: {ws_url})")
 
+    def _reset_broker_to_render(self) -> None:
+        """Resets broker connection to the default cloud Render server."""
+        self.entry_broker_url.delete(0, tk.END)
+        self.entry_broker_url.insert(0, "https://alexa-windows-broker.onrender.com")
+        self._apply_broker_url()
+        messagebox.showinfo(
+            "Render Cloud Configured",
+            "Broker reset to Render Cloud URL:\n\nhttps://alexa-windows-broker.onrender.com\n\nAgent is now reconnecting to the cloud broker.",
+            parent=self,
+        )
+
     def _reset_broker_to_localhost(self) -> None:
         """Resets broker connection back to local development server."""
         self.entry_broker_url.delete(0, tk.END)
@@ -1438,13 +1598,21 @@ class WindowsAgentGUI(ctk.CTk):
 
     def _copy_alexa_webhook(self) -> None:
         """Copies the configured Alexa Webhook URL to the clipboard."""
-        endpoint = self.lbl_alexa_webhook.cget("text")
+        endpoint = f"{self.config.broker_api_url.rstrip('/')}/alexa"
         self.clipboard_clear()
         self.clipboard_append(endpoint)
         self._log_message(f"Copied Alexa Endpoint to clipboard: {endpoint}")
         messagebox.showinfo(
             "Copied to Clipboard",
-            f"Alexa Endpoint URL copied:\n\n{endpoint}\n\nPaste this in the Alexa Developer Console under 'Endpoint > HTTPS > Default Region'.",
+            f"Alexa Webhook Endpoint URL copied successfully!\n\n"
+            f"{endpoint}\n\n"
+            "Steps in Alexa Developer Console:\n"
+            "1. Open your skill in developer.amazon.com\n"
+            "2. Navigate to: Build > Endpoint\n"
+            "3. Select 'HTTPS'\n"
+            "4. Paste this URL into 'Default Region'\n"
+            "5. Select: 'My development endpoint is a sub-domain of a domain that has a wildcard certificate from a certificate authority'\n"
+            "6. Click 'Save Endpoints'",
             parent=self,
         )
 

@@ -1,0 +1,5 @@
+{
+  "appearance_mode": "Light",
+  "broker_api_url": "https://alexa-windows-broker.onrender.com",
+  "broker_ws_url": "wss://alexa-windows-broker.onrender.com/ws/agent"
+}

@@ -14,6 +14,47 @@ from typing import Dict, Any, Optional
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
+def find_model_path() -> Path:
+    """Finds the en-US.json interaction model file across frozen and script environments."""
+    candidates = []
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).parent
+        candidates.append(exe_dir / "alexa_skill" / "interaction_model" / "en-US.json")
+        if hasattr(sys, "_MEIPASS"):
+            candidates.append(Path(sys._MEIPASS) / "alexa_skill" / "interaction_model" / "en-US.json")
+        candidates.append(exe_dir.parent.parent / "alexa_skill" / "interaction_model" / "en-US.json")
+
+    candidates.extend([
+        PROJECT_ROOT / "alexa_skill" / "interaction_model" / "en-US.json",
+        Path.cwd() / "alexa_skill" / "interaction_model" / "en-US.json",
+    ])
+
+    for p in candidates:
+        if p.exists():
+            return p
+    return candidates[0]
+
+
+def find_custom_commands_path() -> Path:
+    """Finds the custom_commands.json file across frozen and script environments."""
+    candidates = []
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).parent
+        candidates.append(exe_dir / "custom_commands.json")
+        if hasattr(sys, "_MEIPASS"):
+            candidates.append(Path(sys._MEIPASS) / "custom_commands.json")
+
+    candidates.extend([
+        PROJECT_ROOT / "custom_commands.json",
+        Path.cwd() / "custom_commands.json",
+    ])
+
+    for p in candidates:
+        if p.exists():
+            return p
+    return candidates[0]
+
+
 def sync_interaction_model(
     custom_commands_path: Optional[Path] = None,
     model_path: Optional[Path] = None,
@@ -23,8 +64,8 @@ def sync_interaction_model(
     1. Adds custom web triggers to PREDEFINED_WEBSITE_TYPE with voice synonyms.
     2. Adds carrier utterances (open/launch/run/start/play/trigger {CommandName}) to RunCustomCommandIntent.
     """
-    cmd_file = custom_commands_path or (PROJECT_ROOT / "custom_commands.json")
-    model_file = model_path or (PROJECT_ROOT / "alexa_skill" / "interaction_model" / "en-US.json")
+    cmd_file = custom_commands_path or find_custom_commands_path()
+    model_file = model_path or find_model_path()
 
     if not cmd_file.exists() or not model_file.exists():
         return {}
@@ -98,9 +139,12 @@ def sync_interaction_model(
 
 def get_interaction_model_json_string() -> str:
     """Returns the formatted JSON content of the interaction model."""
-    model_file = PROJECT_ROOT / "alexa_skill" / "interaction_model" / "en-US.json"
+    model_file = find_model_path()
     if model_file.exists():
-        return model_file.read_text(encoding="utf-8")
+        try:
+            return model_file.read_text(encoding="utf-8")
+        except Exception:
+            pass
     return ""
 
 

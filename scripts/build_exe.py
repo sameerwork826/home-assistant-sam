@@ -29,6 +29,9 @@ def build_executable() -> Path:
     icon_path = PROJECT_ROOT / "assets" / "icon.ico"
     assets_dir = PROJECT_ROOT / "assets"
     custom_cmds = PROJECT_ROOT / "custom_commands.json"
+    ui_settings_file = PROJECT_ROOT / "ui_settings.json"
+    env_file = PROJECT_ROOT / ".env"
+    alexa_skill_dir = PROJECT_ROOT / "alexa_skill"
     entry_point = PROJECT_ROOT / "windows_agent" / "main.py"
 
     pyinstaller_cmd = [
@@ -42,6 +45,8 @@ def build_executable() -> Path:
         f"--icon={icon_path}",
         f"--add-data={assets_dir};assets",
         f"--add-data={custom_cmds};.",
+        f"--add-data={ui_settings_file};.",
+        f"--add-data={alexa_skill_dir};alexa_skill",
         "--hidden-import=customtkinter",
         "--hidden-import=PIL",
         "--hidden-import=pystray",
@@ -65,8 +70,15 @@ def build_executable() -> Path:
     if not exe_path.exists():
         raise FileNotFoundError(f"Expected executable not found at {exe_path}")
 
-    # Ensure assets and custom_commands.json are present in the dist directory
+    # Ensure assets, custom_commands.json, ui_settings.json, and alexa_skill are present in the dist directory
     shutil.copy2(custom_cmds, exe_dir / "custom_commands.json")
+    if ui_settings_file.exists():
+        shutil.copy2(ui_settings_file, exe_dir / "ui_settings.json")
+    if env_file.exists():
+        shutil.copy2(env_file, exe_dir / ".env")
+    if alexa_skill_dir.exists():
+        shutil.copytree(alexa_skill_dir, exe_dir / "alexa_skill", dirs_exist_ok=True)
+
     dest_assets = exe_dir / "assets"
     dest_assets.mkdir(exist_ok=True)
     for asset_file in assets_dir.glob("*.*"):

@@ -5,7 +5,7 @@ a = Analysis(
     ['C:/Users/nande/Desktop/projects/home-assistant-sam/windows_agent/main.py'],
     pathex=[],
     binaries=[],
-    datas=[('C:/Users/nande/Desktop/projects/home-assistant-sam/assets', 'assets'), ('C:/Users/nande/Desktop/projects/home-assistant-sam/custom_commands.json', '.')],
+    datas=[('C:/Users/nande/Desktop/projects/home-assistant-sam/assets', 'assets'), ('C:/Users/nande/Desktop/projects/home-assistant-sam/custom_commands.json', '.'), ('C:/Users/nande/Desktop/projects/home-assistant-sam/ui_settings.json', '.'), ('C:/Users/nande/Desktop/projects/home-assistant-sam/alexa_skill', 'alexa_skill')],
     hiddenimports=['customtkinter', 'PIL', 'pystray', 'pystray._win32', 'websockets', 'uvicorn', 'fastapi', 'pydantic', 'pydantic_settings'],
     hookspath=[],
     hooksconfig={},

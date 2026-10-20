@@ -7,11 +7,16 @@ import os
 import shutil
 from pathlib import Path
 from typing import Dict, Optional
+import sys
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
-# Load .env file from workspace root or current directory
+# Load .env file from workspace root, current directory, or exe directory
 load_dotenv()
+if getattr(sys, "frozen", False):
+    exe_env = Path(sys.executable).parent / ".env"
+    if exe_env.exists():
+        load_dotenv(exe_env, override=True)
 
 
 def find_chrome_executable() -> Optional[str]:
@@ -85,8 +90,12 @@ class AgentConfig(BaseModel):
     """Runtime configuration for the Windows Agent."""
 
     agent_id: str = Field(default_factory=lambda: os.getenv("AGENT_ID", "windows-laptop-primary"))
-    broker_api_url: str = Field(default_factory=lambda: os.getenv("BROKER_API_URL", "http://localhost:8000"))
-    broker_ws_url: str = Field(default_factory=lambda: os.getenv("BROKER_WS_URL", "ws://localhost:8000/ws/agent"))
+    broker_api_url: str = Field(
+        default_factory=lambda: os.getenv("BROKER_API_URL", "https://alexa-windows-broker.onrender.com")
+    )
+    broker_ws_url: str = Field(
+        default_factory=lambda: os.getenv("BROKER_WS_URL", "wss://alexa-windows-broker.onrender.com/ws/agent")
+    )
     auth_token: str = Field(default_factory=lambda: os.getenv("AGENT_AUTH_TOKEN", "development-secret-token"))
     poll_interval_seconds: float = Field(
         default_factory=lambda: float(os.getenv("AGENT_POLL_INTERVAL_SECONDS", "2.0"))
