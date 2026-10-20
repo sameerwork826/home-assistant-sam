@@ -19,6 +19,13 @@ def build_executable() -> Path:
     print("Building Standalone Alexa Windows Controller (.EXE)...")
     print("=" * 60)
 
+    # Terminate any running instances before rebuilding to avoid Windows file locks
+    if sys.platform == "win32":
+        try:
+            subprocess.run(["taskkill", "/F", "/IM", "AlexaWindowsController.exe"], capture_output=True)
+        except Exception:
+            pass
+
     icon_path = PROJECT_ROOT / "assets" / "icon.ico"
     assets_dir = PROJECT_ROOT / "assets"
     custom_cmds = PROJECT_ROOT / "custom_commands.json"

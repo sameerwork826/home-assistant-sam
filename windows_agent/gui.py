@@ -1018,6 +1018,14 @@ class WindowsAgentGUI(ctk.CTk):
         else:
             custom_command_manager.add_command(trigger, cmd_line, desc, confirm)
             self._log_message(f"Created custom command '{trigger}' -> {cmd_line}")
+
+        try:
+            from windows_agent.interaction_model_sync import sync_interaction_model
+            sync_interaction_model()
+            self._log_message(f"Auto-synchronized Alexa interaction model for trigger '{trigger}'.")
+        except Exception as sync_err:
+            logger.debug(f"Sync model error: {sync_err}")
+
         self._render_commands_list()
 
     def _delete_command_action(self, trigger_name: str) -> None:
@@ -1028,6 +1036,14 @@ class WindowsAgentGUI(ctk.CTk):
         ):
             custom_command_manager.delete_command(trigger_name)
             self._log_message(f"Deleted custom command '{trigger_name}'")
+
+            try:
+                from windows_agent.interaction_model_sync import sync_interaction_model
+                sync_interaction_model()
+                self._log_message(f"Auto-synchronized Alexa interaction model after deleting '{trigger_name}'.")
+            except Exception as sync_err:
+                logger.debug(f"Sync model error: {sync_err}")
+
             self._render_commands_list()
 
     def _run_command_action(self, trigger_name: str, is_custom: bool) -> None:
@@ -1295,6 +1311,89 @@ class WindowsAgentGUI(ctk.CTk):
             ctk.CTkLabel(
                 row, text=str(val), text_color="#0284c7", anchor="w", font=ctk.CTkFont(size=12)
             ).pack(side="left", padx=12, pady=8)
+
+        # 4. Alexa Interaction Model Auto-Sync Card
+        model_card = ctk.CTkFrame(
+            scroll,
+            fg_color=THEME_COLORS["card_bg"],
+            corner_radius=10,
+            border_width=1,
+            border_color=THEME_COLORS["card_border"],
+        )
+        model_card.pack(fill="x", pady=(0, 16))
+
+        ctk.CTkLabel(
+            model_card,
+            text="🔄 Alexa Interaction Model & Voice Triggers Sync",
+            font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
+            text_color=THEME_COLORS["brand_title"],
+        ).pack(anchor="w", padx=16, pady=(14, 4))
+
+        ctk.CTkLabel(
+            model_card,
+            text="Whenever you add or change triggers, the local interaction model (en-US.json) is automatically updated with your new voice triggers, carrier phrases, and website slots. You can copy the generated JSON below and paste it into the Alexa Developer Console > Interaction Model > JSON Editor.",
+            font=ctk.CTkFont(size=12),
+            text_color=THEME_COLORS["text_secondary"],
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", padx=16, pady=(0, 12))
+
+        btn_row_model = ctk.CTkFrame(model_card, fg_color="transparent")
+        btn_row_model.pack(fill="x", padx=16, pady=(0, 14))
+
+        btn_copy_model = ctk.CTkButton(
+            btn_row_model,
+            text="📋 Copy Interaction Model JSON",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#0284c7",
+            hover_color="#0369a1",
+            text_color="#ffffff",
+            height=36,
+            command=self._copy_interaction_model_json,
+        )
+        btn_copy_model.pack(side="left", padx=(0, 10))
+
+        btn_sync_now = ctk.CTkButton(
+            btn_row_model,
+            text="🔄 Re-Sync Model Now",
+            font=ctk.CTkFont(size=12),
+            fg_color=THEME_COLORS["btn_secondary_bg"],
+            hover_color=THEME_COLORS["btn_secondary_hover"],
+            text_color=THEME_COLORS["btn_secondary_text"],
+            height=36,
+            command=self._sync_model_now,
+        )
+        btn_sync_now.pack(side="left")
+
+    def _copy_interaction_model_json(self) -> None:
+        """Copies the synchronized Alexa interaction model JSON to the clipboard."""
+        from windows_agent.interaction_model_sync import get_interaction_model_json_string, sync_interaction_model
+        sync_interaction_model()
+        json_str = get_interaction_model_json_string()
+        if json_str:
+            self.clipboard_clear()
+            self.clipboard_append(json_str)
+            self._log_message("Copied Alexa Interaction Model JSON to clipboard.")
+            messagebox.showinfo(
+                "Copied to Clipboard",
+                "Updated Alexa Interaction Model JSON copied to clipboard!\n\n"
+                "In Alexa Developer Console:\n"
+                "1. Go to Build > Interaction Model > JSON Editor\n"
+                "2. Paste (Ctrl+V) and click 'Save Model'\n"
+                "3. Click 'Build Model'",
+                parent=self,
+            )
+
+    def _sync_model_now(self) -> None:
+        """Manually runs the interaction model synchronization."""
+        from windows_agent.interaction_model_sync import sync_interaction_model
+        res = sync_interaction_model()
+        self._log_message("Manually re-synchronized Alexa Interaction Model.")
+        messagebox.showinfo(
+            "Model Synchronized",
+            "Interaction model file (en-US.json) has been refreshed with all custom commands!",
+            parent=self,
+        )
 
     def _apply_broker_url(self) -> None:
         """Applies a newly entered Broker URL, deduces WebSocket URL, and reconnects."""

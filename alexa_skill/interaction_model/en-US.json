@@ -10,35 +10,80 @@
               "id": "google",
               "name": {
                 "value": "google",
-                "synonyms": ["google search", "the search engine", "google dot com"]
+                "synonyms": [
+                  "google search",
+                  "the search engine",
+                  "google dot com"
+                ]
               }
             },
             {
               "id": "youtube",
               "name": {
                 "value": "youtube",
-                "synonyms": ["you tube", "video site", "youtube dot com"]
+                "synonyms": [
+                  "you tube",
+                  "video site",
+                  "youtube dot com"
+                ]
               }
             },
             {
               "id": "github",
               "name": {
                 "value": "github",
-                "synonyms": ["git hub", "git", "github dot com"]
+                "synonyms": [
+                  "git hub",
+                  "git",
+                  "github dot com"
+                ]
               }
             },
             {
               "id": "reddit",
               "name": {
                 "value": "reddit",
-                "synonyms": ["the front page", "reddit dot com"]
+                "synonyms": [
+                  "the front page",
+                  "reddit dot com"
+                ]
               }
             },
             {
               "id": "chatgpt",
               "name": {
                 "value": "chatgpt",
-                "synonyms": ["chat gpt", "openai", "chat gpt dot com"]
+                "synonyms": [
+                  "chat gpt",
+                  "openai",
+                  "chat gpt dot com"
+                ]
+              }
+            },
+            {
+              "id": "my_starhot",
+              "name": {
+                "value": "my_starhot",
+                "synonyms": [
+                  "my_starhot",
+                  "my_starhot",
+                  "my_starhot dot com",
+                  "open my_starhot",
+                  "go to my_starhot"
+                ]
+              }
+            },
+            {
+              "id": "netlfix",
+              "name": {
+                "value": "open netlfix",
+                "synonyms": [
+                  "open netlfix",
+                  "netlfix",
+                  "netlfix dot com",
+                  "open netlfix",
+                  "go to netlfix"
+                ]
               }
             }
           ]
@@ -237,14 +282,20 @@
             }
           ],
           "samples": [
-            "run {CommandName}",
-            "trigger {CommandName}",
+            "execute command {CommandName}",
             "execute {CommandName}",
-            "start {CommandName}",
             "launch {CommandName}",
-            "run the command {CommandName}",
+            "open app {CommandName}",
+            "open website {CommandName}",
+            "open {CommandName}",
+            "play {CommandName}",
             "run command {CommandName}",
-            "trigger command {CommandName}"
+            "run the command {CommandName}",
+            "run {CommandName}",
+            "start app {CommandName}",
+            "start {CommandName}",
+            "trigger command {CommandName}",
+            "trigger {CommandName}"
           ]
         }
       ]
