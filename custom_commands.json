@@ -16,14 +16,6 @@
     "created_at": 1792506192.0110703
   },
   {
-    "trigger_name": "paint",
-    "command_line": "mspaint.exe",
-    "description": "Launches Microsoft Paint",
-    "confirmation_required": false,
-    "enabled": true,
-    "created_at": 1792506192.0110722
-  },
-  {
     "trigger_name": "task_manager",
     "command_line": "taskmgr.exe",
     "description": "Opens Windows Task Manager",
@@ -38,5 +30,21 @@
     "confirmation_required": false,
     "enabled": true,
     "created_at": 1792506192.0110753
+  },
+  {
+    "trigger_name": "open youtube",
+    "command_line": "start https://www.youtube.com",
+    "description": "opens youtube",
+    "confirmation_required": false,
+    "enabled": true,
+    "created_at": 1792506849.8443627
+  },
+  {
+    "trigger_name": "mute pc",
+    "command_line": "powershell -c \"(New-Object -ComObject WScript.Shell).SendKeys([char]173)\"",
+    "description": "",
+    "confirmation_required": false,
+    "enabled": true,
+    "created_at": 1792506936.94374
   }
 ]

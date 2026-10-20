@@ -201,25 +201,45 @@ class CustomCommandManager:
                 error_category="COMMAND_DISABLED",
             )
 
-        raw_cmd = cmd.command_line
+        raw_cmd = cmd.command_line.strip()
 
         logger.info(f"Executing custom command: '{raw_cmd}' (trigger: '{trigger_name}')")
 
         try:
-            # Parse command line safely into argument list
-            args = shlex.split(raw_cmd, posix=False)
+            # 1. Direct URL handling (e.g. https://www.youtube.com or www.reddit.com)
+            if raw_cmd.startswith(("http://", "https://")):
+                import webbrowser
+                webbrowser.open(raw_cmd)
+                return CommandExecutionResult(
+                    success=True,
+                    command_id=f"custom_{cleaned_trigger}",
+                    message=f"Opened {raw_cmd} in your browser.",
+                    data={"trigger_name": cleaned_trigger, "url": raw_cmd},
+                )
+            elif raw_cmd.startswith("www."):
+                import webbrowser
+                full_url = f"https://{raw_cmd}"
+                webbrowser.open(full_url)
+                return CommandExecutionResult(
+                    success=True,
+                    command_id=f"custom_{cleaned_trigger}",
+                    message=f"Opened {full_url} in your browser.",
+                    data={"trigger_name": cleaned_trigger, "url": full_url},
+                )
+
+            # 2. General Windows Command Execution (TriggerCMD style)
             creationflags = 0
             if WindowsSessionManager.is_windows():
                 # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
                 creationflags = 0x00000008 | 0x00000200
-
-            # Launch detached in user session
-            subprocess.Popen(
-                args,
-                shell=False,
-                creationflags=creationflags,
-                close_fds=True,
-            )
+                cmd_to_run = f'cmd.exe /c "{raw_cmd}"'
+                subprocess.Popen(
+                    cmd_to_run,
+                    shell=True,
+                    creationflags=creationflags,
+                )
+            else:
+                subprocess.Popen(raw_cmd, shell=True)
 
             return CommandExecutionResult(
                 success=True,

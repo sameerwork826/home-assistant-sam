@@ -81,8 +81,13 @@ def test_execute_custom_command_mocked(custom_mgr):
         assert res.success
         assert "Executed Testapp" in res.message
         mock_popen.assert_called_once()
-        args = mock_popen.call_args[0][0]
-        assert args == ["testapp.exe", "--arg"]
+
+    # Also test URL opening with webbrowser.open
+    custom_mgr.add_command(trigger_name="mysite", command_line="https://example.com")
+    with patch("webbrowser.open") as mock_browser:
+        res_url = custom_mgr.execute("mysite")
+        assert res_url.success
+        mock_browser.assert_called_once_with("https://example.com")
 
 
 def test_execute_unknown_custom_command_rejected(custom_mgr):

@@ -211,9 +211,14 @@ class AgentApiClient:
                 logger.info("Agent shutdown requested.")
                 break
             except Exception as ex:
-                logger.warning(
-                    f"WebSocket connection lost or failed: {ex}. Retrying in {self._reconnect_delay}s..."
-                )
+                if "Connect call failed" in str(ex) or "refused" in str(ex).lower():
+                    logger.info(
+                        f"Broker not reachable at {self.config.broker_ws_url}. Waiting for broker to start... (Retrying in {int(self._reconnect_delay)}s)"
+                    )
+                else:
+                    logger.warning(
+                        f"WebSocket connection lost: {ex}. Retrying in {int(self._reconnect_delay)}s..."
+                    )
                 # Attempt an HTTP poll as fallback during disconnection
                 await self.poll_commands_http()
 
