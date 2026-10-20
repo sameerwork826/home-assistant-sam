@@ -49,11 +49,15 @@ class CommandRegistry:
     def __init__(self) -> None:
         self._commands: Dict[str, CommandDefinition] = {}
 
-    def register(self, definition: CommandDefinition) -> None:
+    def register(self, definition: CommandDefinition, overwrite: bool = True) -> None:
         """Registers a predefined command definition."""
-        if definition.command_id in self._commands:
+        if definition.command_id in self._commands and not overwrite:
             raise ValueError(f"Command '{definition.command_id}' is already registered.")
         self._commands[definition.command_id] = definition
+
+    def clear(self) -> None:
+        """Clears all registered commands (useful in test teardown)."""
+        self._commands.clear()
 
     def get(self, command_id: str) -> Optional[CommandDefinition]:
         """Retrieves a command definition by ID."""
