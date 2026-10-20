@@ -54,6 +54,11 @@ def parse_arguments() -> argparse.Namespace:
         help="Launch the modern Windows 11 desktop GUI application with TriggerCMD command manager",
     )
     parser.add_argument(
+        "--minimized",
+        action="store_true",
+        help="Start the application directly minimized to the system tray",
+    )
+    parser.add_argument(
         "--cli",
         action="store_true",
         help="Run in headless terminal background mode",
@@ -164,12 +169,13 @@ def main() -> None:
             print(f"Error Category: {result.error_category}")
         sys.exit(0 if result.success else 1)
 
-    if args.gui:
-        from windows_agent.gui import launch_gui
-        launch_gui()
+    if args.cli:
+        asyncio.run(run_agent())
         return
 
-    asyncio.run(run_agent())
+    # Default to GUI when double-clicked or with --gui or --minimized
+    from windows_agent.gui import launch_gui
+    launch_gui(start_minimized=args.minimized)
 
 
 if __name__ == "__main__":

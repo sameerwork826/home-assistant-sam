@@ -7,6 +7,7 @@ Persists commands to custom_commands.json with validation and hot-reloading.
 
 import json
 import os
+import sys
 import shlex
 import subprocess
 import time
@@ -41,7 +42,11 @@ class CustomCommandManager:
     """Manages creation, persistence, and execution of custom Windows commands."""
 
     def __init__(self, file_path: str = "./custom_commands.json") -> None:
-        self.file_path = Path(file_path)
+        if getattr(sys, "frozen", False):
+            base_dir = Path(sys.executable).parent
+            self.file_path = base_dir / "custom_commands.json"
+        else:
+            self.file_path = Path(file_path)
         self._commands: Dict[str, CustomCommand] = {}
         self.load()
 

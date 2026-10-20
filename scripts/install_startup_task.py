@@ -33,7 +33,7 @@ def install() -> None:
     # Create batch file to activate venv and run agent
     bat_content = f"""@echo off
 cd /d "{project_root}"
-"{python_exe}" -m windows_agent.main >> "{project_root}\\logs\\agent_startup.log" 2>&1
+"{python_exe}" -m windows_agent.main --minimized >> "{project_root}\\logs\\agent_startup.log" 2>&1
 """
     bat_path.write_text(bat_content, encoding="utf-8")
 

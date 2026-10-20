@@ -2,24 +2,34 @@
 Windows Agent Desktop GUI Application.
 Modern Windows 11 Fluent interface built with CustomTkinter.
 Features:
+- Bright modern Fluent light theme by default + 1-click Dark Mode switcher
+- System Tray (pystray) background runner with quick actions & close-to-tray
+- Single-instance activation (<50ms instant window restore when launched from shortcut)
 - Live WebSocket connection status & embedded Local Broker Controller
 - Built-in command replication / duplication (replicate any built-in command to edit URL/script)
 - TriggerCMD-style custom command manager with URL, script, and app support
 - File browser to pick executables and scripts
-- Real-time command search & filtering
+- Real-time command search & filtering with debounce
 - Live execution logs with performance metrics
 """
 
 import os
 import sys
+import json
 import time
 import asyncio
 import threading
 import tkinter as tk
+from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Optional, List, Dict, Any
 
 import customtkinter as ctk
+
+# Add project root to sys.path
+root_dir = Path(__file__).resolve().parent.parent
+if str(root_dir) not in sys.path:
+    sys.path.insert(0, str(root_dir))
 
 from windows_agent.config import AgentConfig, get_agent_config
 from windows_agent.session_manager import WindowsSessionManager
@@ -31,9 +41,68 @@ from windows_agent.logging_config import setup_logger
 
 logger = setup_logger("gui")
 
-# Set CustomTkinter theme to dark modern Windows 11 style
-ctk.set_appearance_mode("Dark")
+SINGLE_INSTANCE_PORT = 28931
+
+
+# ------------------------------------------------------------------------------
+# Theme Persistence & Palette Definitions
+# ------------------------------------------------------------------------------
+
+def get_ui_settings_path() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent / "ui_settings.json"
+    return Path("./ui_settings.json")
+
+
+def load_ui_theme() -> str:
+    path = get_ui_settings_path()
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data.get("appearance_mode", "Light")
+        except Exception:
+            pass
+    return "Light"
+
+
+def save_ui_theme(mode: str) -> None:
+    try:
+        path = get_ui_settings_path()
+        path.write_text(json.dumps({"appearance_mode": mode}, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+# Dynamic tuple colors: ("light_mode_color", "dark_mode_color")
+THEME_COLORS = {
+    "window_bg": ("#f8fafc", "#0b0f19"),
+    "header_bg": ("#ffffff", "#151e2e"),
+    "header_border": ("#e2e8f0", "#1f293d"),
+    "brand_title": ("#0f172a", "#f8fafc"),
+    "brand_subtitle": ("#475569", "#94a3b8"),
+    "card_bg": ("#ffffff", "#151e2e"),
+    "card_border": ("#e2e8f0", "#1f293d"),
+    "row_bg": ("#ffffff", "#0e1524"),
+    "row_border": ("#e2e8f0", "#1e293b"),
+    "text_primary": ("#0f172a", "#f8fafc"),
+    "text_secondary": ("#475569", "#94a3b8"),
+    "text_muted": ("#64748b", "#64748b"),
+    "input_bg": ("#f8fafc", "#0b0f19"),
+    "input_border": ("#cbd5e1", "#2563eb"),
+    "btn_secondary_bg": ("#f1f5f9", "#1e293b"),
+    "btn_secondary_hover": ("#e2e8f0", "#334155"),
+    "btn_secondary_text": ("#0f172a", "#f8fafc"),
+    "code_box_bg": ("#f1f5f9", "#111827"),
+    "code_box_text": ("#0369a1", "#38bdf8"),
+    "console_bg": ("#f8fafc", "#070a12"),
+    "console_text": ("#0f172a", "#38bdf8"),
+}
+
+# Set initial appearance mode
+initial_mode = load_ui_theme()
+ctk.set_appearance_mode(initial_mode)
 ctk.set_default_color_theme("blue")
+
 
 # Template configurations for built-in command replication
 BUILTIN_DUPLICATE_TEMPLATES: Dict[str, Dict[str, Any]] = {
@@ -111,11 +180,10 @@ class AddEditCommandDialog(ctk.CTkToplevel):
             title_text = "Create New Voice Command"
 
         self.title(title_text)
-        self.geometry("600x560")
-        self.minsize(560, 520)
-        self.configure(fg_color="#0b0f19")
+        self.geometry("620x580")
+        self.minsize(580, 540)
+        self.configure(fg_color=THEME_COLORS["window_bg"])
 
-        # Keep modal on top of parent
         self.transient(parent)
         self.grab_set()
 
@@ -123,7 +191,13 @@ class AddEditCommandDialog(ctk.CTkToplevel):
 
     def _build_ui(self) -> None:
         # Header banner
-        header_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#151e2e")
+        header_frame = ctk.CTkFrame(
+            self,
+            corner_radius=0,
+            fg_color=THEME_COLORS["header_bg"],
+            border_width=1,
+            border_color=THEME_COLORS["header_border"],
+        )
         header_frame.pack(fill="x", pady=(0, 16))
 
         title_text = "Duplicate & Customize Command" if self.is_replication else (
@@ -133,7 +207,7 @@ class AddEditCommandDialog(ctk.CTkToplevel):
             header_frame,
             text=title_text,
             font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
-            text_color="#f8fafc",
+            text_color=THEME_COLORS["brand_title"],
         ).pack(anchor="w", padx=24, pady=(16, 2))
 
         subtitle_text = (
@@ -145,10 +219,9 @@ class AddEditCommandDialog(ctk.CTkToplevel):
             header_frame,
             text=subtitle_text,
             font=ctk.CTkFont(size=12),
-            text_color="#94a3b8",
+            text_color=THEME_COLORS["brand_subtitle"],
         ).pack(anchor="w", padx=24, pady=(0, 14))
 
-        # Main scrollable form container
         form = ctk.CTkFrame(self, fg_color="transparent")
         form.pack(fill="both", expand=True, padx=24)
 
@@ -156,165 +229,184 @@ class AddEditCommandDialog(ctk.CTkToplevel):
         if not self.command_to_edit or self.is_replication:
             preset_row = ctk.CTkFrame(form, fg_color="transparent")
             preset_row.pack(fill="x", pady=(0, 12))
-            ctk.CTkLabel(preset_row, text="Quick Presets:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#64748b").pack(side="left", padx=(0, 8))
+            ctk.CTkLabel(
+                preset_row,
+                text="Quick Presets:",
+                font=ctk.CTkFont(size=11, weight="bold"),
+                text_color=THEME_COLORS["text_muted"],
+            ).pack(side="left", padx=(0, 8))
 
             ctk.CTkButton(
-                preset_row, text="🌐 Website URL", height=24, font=ctk.CTkFont(size=11),
-                fg_color="#1e293b", hover_color="#334155",
+                preset_row, text="🌐 Website URL", height=26, font=ctk.CTkFont(size=11),
+                fg_color=THEME_COLORS["btn_secondary_bg"],
+                hover_color=THEME_COLORS["btn_secondary_hover"],
+                text_color=THEME_COLORS["btn_secondary_text"],
                 command=lambda: self._apply_preset("website", "https://www.youtube.com", "Opens website in browser")
             ).pack(side="left", padx=4)
 
             ctk.CTkButton(
-                preset_row, text="🖥️ Launch App", height=24, font=ctk.CTkFont(size=11),
-                fg_color="#1e293b", hover_color="#334155",
+                preset_row, text="🖥️ Launch App", height=26, font=ctk.CTkFont(size=11),
+                fg_color=THEME_COLORS["btn_secondary_bg"],
+                hover_color=THEME_COLORS["btn_secondary_hover"],
+                text_color=THEME_COLORS["btn_secondary_text"],
                 command=lambda: self._apply_preset("app", "notepad.exe", "Launches Windows application")
             ).pack(side="left", padx=4)
 
             ctk.CTkButton(
-                preset_row, text="⚡ PowerShell Script", height=24, font=ctk.CTkFont(size=11),
-                fg_color="#1e293b", hover_color="#334155",
+                preset_row, text="⚡ PowerShell Script", height=26, font=ctk.CTkFont(size=11),
+                fg_color=THEME_COLORS["btn_secondary_bg"],
+                hover_color=THEME_COLORS["btn_secondary_hover"],
+                text_color=THEME_COLORS["btn_secondary_text"],
                 command=lambda: self._apply_preset("script", "powershell.exe -ExecutionPolicy Bypass -File C:\\script.ps1", "Runs custom PowerShell script")
             ).pack(side="left", padx=4)
 
         # 1. Trigger Name
-        ctk.CTkLabel(form, text="Voice Trigger Word (What you say to Alexa):", font=ctk.CTkFont(weight="bold"), text_color="#f8fafc").pack(anchor="w")
-        self.trigger_entry = ctk.CTkEntry(
+        ctk.CTkLabel(
             form,
-            placeholder_text="e.g. netflix, spotify, calculator, backup",
-            height=38,
-            corner_radius=8,
-            fg_color="#151e2e",
-            border_color="#2a3b53",
+            text="Voice Trigger Word (What you say to Alexa):",
+            font=ctk.CTkFont(weight="bold", size=13),
+            text_color=THEME_COLORS["text_primary"],
+        ).pack(anchor="w")
+
+        self.entry_trigger = ctk.CTkEntry(
+            form,
+            placeholder_text="e.g. netflix, soundcloud, spotify, build project",
+            fg_color=THEME_COLORS["input_bg"],
+            border_color=THEME_COLORS["input_border"],
+            text_color=THEME_COLORS["text_primary"],
+            height=36,
         )
-        self.trigger_entry.pack(fill="x", pady=(4, 12))
+        self.entry_trigger.pack(fill="x", pady=(4, 12))
 
-        # 2. Command Line to Execute
-        ctk.CTkLabel(form, text="Command Line to Execute (URL, Executable, or Script):", font=ctk.CTkFont(weight="bold"), text_color="#f8fafc").pack(anchor="w")
-        cmd_box = ctk.CTkFrame(form, fg_color="transparent")
-        cmd_box.pack(fill="x", pady=(4, 12))
+        # 2. Command Line / URL
+        ctk.CTkLabel(
+            form,
+            text="Command Line / Executable / Web URL to Execute:",
+            font=ctk.CTkFont(weight="bold", size=13),
+            text_color=THEME_COLORS["text_primary"],
+        ).pack(anchor="w")
 
-        self.cmd_entry = ctk.CTkEntry(
-            cmd_box,
-            placeholder_text="e.g. https://www.netflix.com  OR  calc.exe  OR  C:\\scripts\\backup.bat",
-            height=38,
-            corner_radius=8,
-            fg_color="#151e2e",
-            border_color="#2a3b53",
+        cmd_row = ctk.CTkFrame(form, fg_color="transparent")
+        cmd_row.pack(fill="x", pady=(4, 12))
+
+        self.entry_command = ctk.CTkEntry(
+            cmd_row,
+            placeholder_text="e.g. https://netflix.com OR notepad.exe OR C:\\scripts\\backup.bat",
+            fg_color=THEME_COLORS["input_bg"],
+            border_color=THEME_COLORS["input_border"],
+            text_color=THEME_COLORS["text_primary"],
+            height=36,
         )
-        self.cmd_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.entry_command.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
-        browse_btn = ctk.CTkButton(
-            cmd_box,
-            text="Browse...",
+        btn_browse = ctk.CTkButton(
+            cmd_row,
+            text="📁 Browse...",
             width=90,
-            height=38,
-            corner_radius=8,
-            fg_color="#1e293b",
-            hover_color="#334155",
-            command=self._on_browse,
+            height=36,
+            fg_color=THEME_COLORS["btn_secondary_bg"],
+            hover_color=THEME_COLORS["btn_secondary_hover"],
+            text_color=THEME_COLORS["btn_secondary_text"],
+            command=self._browse_file,
         )
-        browse_btn.pack(side="right")
+        btn_browse.pack(side="left")
 
         # 3. Description
-        ctk.CTkLabel(form, text="Description (Optional):", font=ctk.CTkFont(weight="bold"), text_color="#f8fafc").pack(anchor="w")
-        self.desc_entry = ctk.CTkEntry(
+        ctk.CTkLabel(
             form,
-            placeholder_text="e.g. Opens Netflix in default web browser",
-            height=38,
-            corner_radius=8,
-            fg_color="#151e2e",
-            border_color="#2a3b53",
-        )
-        self.desc_entry.pack(fill="x", pady=(4, 12))
+            text="Description (Optional):",
+            font=ctk.CTkFont(weight="bold", size=13),
+            text_color=THEME_COLORS["text_primary"],
+        ).pack(anchor="w")
 
-        # 4. Confirmation Switch
-        self.confirm_switch = ctk.CTkSwitch(
+        self.entry_desc = ctk.CTkEntry(
             form,
-            text="Require Alexa voice confirmation before executing (e.g. for restart/shutdown)",
+            placeholder_text="e.g. Opens Netflix in default browser",
+            fg_color=THEME_COLORS["input_bg"],
+            border_color=THEME_COLORS["input_border"],
+            text_color=THEME_COLORS["text_primary"],
+            height=36,
+        )
+        self.entry_desc.pack(fill="x", pady=(4, 12))
+
+        # 4. Confirmation Required Checkbox
+        self.chk_confirm = ctk.CTkCheckBox(
+            form,
+            text="Require verbal confirmation before execution (Recommended for shutdown/restart)",
+            text_color=THEME_COLORS["text_primary"],
             font=ctk.CTkFont(size=12),
         )
-        self.confirm_switch.pack(anchor="w", pady=(8, 14))
+        self.chk_confirm.pack(anchor="w", pady=(4, 16))
 
-        # Fill values if editing or replicating
+        # Populate if editing or replicating
         if self.command_to_edit:
-            self.trigger_entry.insert(0, self.command_to_edit.trigger_name)
-            self.cmd_entry.insert(0, self.command_to_edit.command_line)
+            self.entry_trigger.insert(0, self.command_to_edit.trigger_name)
+            self.entry_command.insert(0, self.command_to_edit.command_line)
             if self.command_to_edit.description:
-                self.desc_entry.insert(0, self.command_to_edit.description)
+                self.entry_desc.insert(0, self.command_to_edit.description)
             if self.command_to_edit.confirmation_required:
-                self.confirm_switch.select()
+                self.chk_confirm.select()
 
-            if not self.is_replication:
-                # If editing existing custom command, freeze trigger name to prevent key collisions
-                self.trigger_entry.configure(state="disabled")
+        # Dialog Buttons
+        btn_row = ctk.CTkFrame(self, fg_color="transparent")
+        btn_row.pack(fill="x", padx=24, pady=16)
 
-        # Alexa Voice Preview Card
-        self.preview_card = ctk.CTkFrame(form, corner_radius=8, fg_color="#151e2e", border_width=1, border_color="#2a3b53")
-        self.preview_card.pack(fill="x", pady=(0, 16))
-        self.preview_label = ctk.CTkLabel(
-            self.preview_card,
-            text="Alexa Voice Syntax: \"Alexa, ask My PC to run <trigger>\"",
-            font=ctk.CTkFont(size=12),
-            text_color="#06b6d4",
-        )
-        self.preview_label.pack(padx=12, pady=8)
-
-        # Buttons footer
-        btn_frame = ctk.CTkFrame(self, fg_color="#0b0f19")
-        btn_frame.pack(fill="x", padx=24, pady=(0, 16))
-
-        cancel_btn = ctk.CTkButton(
-            btn_frame,
+        btn_cancel = ctk.CTkButton(
+            btn_row,
             text="Cancel",
             width=100,
             height=36,
-            fg_color="#1e293b",
-            hover_color="#334155",
+            fg_color=THEME_COLORS["btn_secondary_bg"],
+            hover_color=THEME_COLORS["btn_secondary_hover"],
+            text_color=THEME_COLORS["btn_secondary_text"],
             command=self.destroy,
         )
-        cancel_btn.pack(side="right", padx=(8, 0))
+        btn_cancel.pack(side="right", padx=(8, 0))
 
-        save_btn = ctk.CTkButton(
-            btn_frame,
-            text="Save Custom Command",
-            width=170,
+        btn_save = ctk.CTkButton(
+            btn_row,
+            text="Save Voice Command",
+            width=160,
             height=36,
             font=ctk.CTkFont(weight="bold"),
-            fg_color="#10b981",
-            hover_color="#059669",
-            command=self._on_save,
+            fg_color="#2563eb",
+            hover_color="#1d4ed8",
+            command=self._save,
         )
-        save_btn.pack(side="right")
+        btn_save.pack(side="right")
 
-    def _apply_preset(self, p_name: str, p_cmd: str, p_desc: str) -> None:
-        self.cmd_entry.delete(0, tk.END)
-        self.cmd_entry.insert(0, p_cmd)
-        self.desc_entry.delete(0, tk.END)
-        self.desc_entry.insert(0, p_desc)
+    def _apply_preset(self, p_type: str, cmd: str, desc: str) -> None:
+        self.entry_command.delete(0, tk.END)
+        self.entry_command.insert(0, cmd)
+        self.entry_desc.delete(0, tk.END)
+        self.entry_desc.insert(0, desc)
+        if not self.entry_trigger.get():
+            self.entry_trigger.insert(0, p_type)
 
-    def _on_browse(self) -> None:
-        filetypes = [
-            ("All Supported Executables & Scripts", "*.exe;*.bat;*.cmd;*.ps1;*.vbs;*.py"),
-            ("Executables (*.exe)", "*.exe"),
-            ("Batch Scripts (*.bat, *.cmd)", "*.bat;*.cmd"),
-            ("PowerShell Scripts (*.ps1)", "*.ps1"),
-            ("All Files (*.*)", "*.*"),
-        ]
-        selected = filedialog.askopenfilename(
+    def _browse_file(self) -> None:
+        file_path = filedialog.askopenfilename(
             parent=self,
-            title="Select File to Execute",
-            filetypes=filetypes,
+            title="Select Application, Script, or Document to Execute",
+            filetypes=[
+                ("All Executables & Scripts", "*.exe;*.bat;*.cmd;*.ps1;*.vbs;*.py;*.url;*.*"),
+                ("Applications (*.exe)", "*.exe"),
+                ("Batch Scripts (*.bat;*.cmd)", "*.bat;*.cmd"),
+                ("PowerShell Scripts (*.ps1)", "*.ps1"),
+                ("All Files (*.*)", "*.*"),
+            ],
         )
-        if selected:
-            formatted = f'"{selected}"' if " " in selected else selected
-            self.cmd_entry.delete(0, tk.END)
-            self.cmd_entry.insert(0, formatted)
+        if file_path:
+            self.entry_command.delete(0, tk.END)
+            self.entry_command.insert(0, file_path)
+            if not self.entry_trigger.get():
+                name = Path(file_path).stem.replace("_", " ").replace("-", " ")
+                self.entry_trigger.insert(0, name)
 
-    def _on_save(self) -> None:
-        trigger = self.trigger_entry.get().strip().lower()
-        cmd_line = self.cmd_entry.get().strip()
-        desc = self.desc_entry.get().strip()
-        confirm = bool(self.confirm_switch.get())
+    def _save(self) -> None:
+        trigger = self.entry_trigger.get().strip().lower()
+        cmd_line = self.entry_command.get().strip()
+        desc = self.entry_desc.get().strip()
+        confirm = bool(self.chk_confirm.get())
 
         if not trigger:
             messagebox.showerror("Error", "Please enter a valid voice trigger name.", parent=self)
@@ -328,19 +420,34 @@ class AddEditCommandDialog(ctk.CTkToplevel):
         self.destroy()
 
 
+# ------------------------------------------------------------------------------
+# Main Application Window
+# ------------------------------------------------------------------------------
+
 class WindowsAgentGUI(ctk.CTk):
     """Main Desktop Window for the Windows Command Agent."""
 
-    def __init__(self, config: Optional[AgentConfig] = None) -> None:
+    def __init__(self, config: Optional[AgentConfig] = None, start_minimized: bool = False) -> None:
         super().__init__()
         self.config = config or get_agent_config()
         self.executor = WindowsExecutor(self.config)
         self.api_client = AgentApiClient(self.config, self.executor)
 
-        self.title("Alexa Windows Command Agent")
-        self.geometry("1040x720")
-        self.minsize(880, 600)
-        self.configure(fg_color="#0b0f19")
+        self.current_theme = load_ui_theme()
+        ctk.set_appearance_mode(self.current_theme)
+
+        self.title("Alexa Windows Controller")
+        self.geometry("1060x740")
+        self.minsize(900, 620)
+        self.configure(fg_color=THEME_COLORS["window_bg"])
+
+        # Window icon
+        icon_path = os.path.join(root_dir, "assets", "icon.ico")
+        if os.path.exists(icon_path):
+            try:
+                self.iconbitmap(icon_path)
+            except Exception:
+                pass
 
         # State management
         self.bg_loop: Optional[asyncio.AbstractEventLoop] = None
@@ -349,14 +456,31 @@ class WindowsAgentGUI(ctk.CTk):
         self.local_broker_thread: Optional[threading.Thread] = None
         self.search_filter = ""
         self.category_filter = "All"
+        self._search_debounce_id = None
+        self.tray_icon = None
 
         self._build_layout()
         self._start_background_client()
         self._start_periodic_ui_refresh()
 
+        # Intercept close window to minimize to tray
+        self.protocol("WM_DELETE_WINDOW", self._on_window_close)
+
+        # Setup System Tray
+        self._setup_tray_icon()
+
+        if start_minimized:
+            self.withdraw()
+
     def _build_layout(self) -> None:
         # Top Header Card
-        self.header_card = ctk.CTkFrame(self, corner_radius=12, fg_color="#151e2e", border_width=1, border_color="#1f293d")
+        self.header_card = ctk.CTkFrame(
+            self,
+            corner_radius=12,
+            fg_color=THEME_COLORS["header_bg"],
+            border_width=1,
+            border_color=THEME_COLORS["header_border"],
+        )
         self.header_card.pack(fill="x", padx=18, pady=(16, 10))
 
         # Top row: Brand & Status
@@ -371,19 +495,47 @@ class WindowsAgentGUI(ctk.CTk):
             brand_frame,
             text="⚡ ALEXA WINDOWS CONTROLLER",
             font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
-            text_color="#f8fafc",
+            text_color=THEME_COLORS["brand_title"],
         ).pack(anchor="w")
 
         ctk.CTkLabel(
             brand_frame,
             text="TriggerCMD Alternative • Real-Time Voice Execution • Windows 11 Desktop Session",
             font=ctk.CTkFont(size=12),
-            text_color="#94a3b8",
+            text_color=THEME_COLORS["brand_subtitle"],
         ).pack(anchor="w")
 
         # Right actions & status
         status_box = ctk.CTkFrame(top_row, fg_color="transparent")
         status_box.pack(side="right")
+
+        # Theme Switcher Button
+        theme_icon = "🌙" if self.current_theme == "Light" else "☀️"
+        theme_label = "Dark Mode" if self.current_theme == "Light" else "Light Mode"
+        self.btn_theme = ctk.CTkButton(
+            status_box,
+            text=f"{theme_icon} {theme_label}",
+            height=32,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=THEME_COLORS["btn_secondary_bg"],
+            hover_color=THEME_COLORS["btn_secondary_hover"],
+            text_color=THEME_COLORS["btn_secondary_text"],
+            command=self._toggle_theme,
+        )
+        self.btn_theme.pack(side="left", padx=(0, 8))
+
+        # Minimize to Tray Button
+        self.btn_minimize = ctk.CTkButton(
+            status_box,
+            text="🔽 Hide to Tray",
+            height=32,
+            font=ctk.CTkFont(size=12),
+            fg_color=THEME_COLORS["btn_secondary_bg"],
+            hover_color=THEME_COLORS["btn_secondary_hover"],
+            text_color=THEME_COLORS["btn_secondary_text"],
+            command=self._on_window_close,
+        )
+        self.btn_minimize.pack(side="left", padx=(0, 8))
 
         # Local Broker Quick-Start Button
         self.btn_local_broker = ctk.CTkButton(
@@ -395,7 +547,7 @@ class WindowsAgentGUI(ctk.CTk):
             hover_color="#1d4ed8",
             command=self._toggle_local_broker,
         )
-        self.btn_local_broker.pack(side="left", padx=(0, 10))
+        self.btn_local_broker.pack(side="left", padx=(0, 8))
 
         # Status Pill
         self.status_pill = ctk.CTkLabel(
@@ -405,7 +557,7 @@ class WindowsAgentGUI(ctk.CTk):
             fg_color="#b45309",
             corner_radius=16,
             text_color="#ffffff",
-            width=160,
+            width=165,
             height=32,
         )
         self.status_pill.pack(side="left")
@@ -422,7 +574,7 @@ class WindowsAgentGUI(ctk.CTk):
             metrics_bar,
             text=f"🖥️ {session_text}",
             font=ctk.CTkFont(size=12),
-            text_color="#38bdf8",
+            text_color="#0284c7",
         )
         self.lbl_session.pack(side="left", padx=(0, 20))
 
@@ -430,7 +582,7 @@ class WindowsAgentGUI(ctk.CTk):
             metrics_bar,
             text=f"📡 Broker: {self.config.broker_api_url}",
             font=ctk.CTkFont(size=12),
-            text_color="#94a3b8",
+            text_color=THEME_COLORS["text_secondary"],
         )
         self.lbl_broker_url.pack(side="left", padx=(0, 20))
 
@@ -438,12 +590,17 @@ class WindowsAgentGUI(ctk.CTk):
             metrics_bar,
             text="⏱️ Uptime: Loading...",
             font=ctk.CTkFont(size=12),
-            text_color="#94a3b8",
+            text_color=THEME_COLORS["text_secondary"],
         )
         self.lbl_uptime.pack(side="left")
 
         # Main Tabview
-        self.tabview = ctk.CTkTabview(self, corner_radius=12, fg_color="#151e2e")
+        self.tabview = ctk.CTkTabview(
+            self,
+            corner_radius=12,
+            fg_color=THEME_COLORS["header_bg"],
+            segmented_button_selected_color="#2563eb",
+        )
         self.tabview.pack(fill="both", expand=True, padx=18, pady=(0, 16))
 
         self.tab_commands = self.tabview.add("Voice Commands Manager")
@@ -454,51 +611,168 @@ class WindowsAgentGUI(ctk.CTk):
         self._build_logs_tab()
         self._build_settings_tab()
 
+    # --------------------------------------------------------------------------
+    # Theme Switching Logic
+    # --------------------------------------------------------------------------
+
+    def _toggle_theme(self) -> None:
+        new_mode = "Dark" if self.current_theme == "Light" else "Light"
+        self.set_theme(new_mode)
+
+    def set_theme(self, mode: str) -> None:
+        self.current_theme = mode
+        save_ui_theme(mode)
+        ctk.set_appearance_mode(mode)
+        theme_icon = "🌙" if mode == "Light" else "☀️"
+        theme_label = "Dark Mode" if mode == "Light" else "Light Mode"
+        self.btn_theme.configure(text=f"{theme_icon} {theme_label}")
+        self._log_message(f"Appearance theme switched to {mode} Mode.")
+
+    # --------------------------------------------------------------------------
+    # System Tray Integration
+    # --------------------------------------------------------------------------
+
+    def _setup_tray_icon(self) -> None:
+        try:
+            import pystray
+            from PIL import Image
+
+            icon_png_path = os.path.join(root_dir, "assets", "icon.png")
+            if os.path.exists(icon_png_path):
+                img = Image.open(icon_png_path)
+            else:
+                img = Image.new("RGBA", (64, 64), color=(37, 99, 235))
+
+            def on_open(icon, item):
+                self.after(0, self._show_window)
+
+            def on_toggle_theme(icon, item):
+                self.after(0, self._toggle_theme)
+
+            def on_run_cmd(cmd_name):
+                self.after(0, lambda: self._run_tray_cmd(cmd_name))
+
+            def on_exit(icon, item):
+                self.after(0, self._quit_completely)
+
+            menu = pystray.Menu(
+                pystray.MenuItem("⚡ Open Alexa Controller", on_open, default=True),
+                pystray.MenuItem("☀️ / 🌙 Toggle Light/Dark Mode", on_toggle_theme),
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("🌐 Open Netflix", lambda icon, item: on_run_cmd("open netlfix")),
+                pystray.MenuItem("🌐 Open Hotstar", lambda icon, item: on_run_cmd("my_starhot")),
+                pystray.MenuItem("🖥️ Open Chrome", lambda icon, item: on_run_cmd("open_chrome")),
+                pystray.MenuItem("📝 Open Notepad", lambda icon, item: on_run_cmd("notepad")),
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("❌ Exit Completely", on_exit),
+            )
+
+            self.tray_icon = pystray.Icon("AlexaController", img, "Alexa Windows Controller", menu=menu)
+            threading.Thread(target=self.tray_icon.run, daemon=True).start()
+        except Exception as ex:
+            logger.warning(f"Failed to initialize system tray icon: {ex}")
+            self.tray_icon = None
+
+    def _run_tray_cmd(self, trigger_name: str) -> None:
+        is_custom = custom_command_manager.get(trigger_name) is not None
+        self._run_command_action(trigger_name, is_custom)
+
+    def _on_window_close(self) -> None:
+        """Minimizes the window to the system tray instead of killing the process."""
+        self.withdraw()
+        self._log_message("Controller minimized to system tray. Listening in background for Alexa commands.")
+        if self.tray_icon and hasattr(self.tray_icon, "notify"):
+            try:
+                self.tray_icon.notify(
+                    "Alexa Windows Controller is active in your system tray.\nDouble-click the tray icon anytime to open.",
+                    "Running in Background",
+                )
+            except Exception:
+                pass
+
+    def _show_window(self) -> None:
+        """Restores and brings the GUI window to the front."""
+        self.deiconify()
+        self.state("normal")
+        self.lift()
+        self.focus_force()
+
+    def _quit_completely(self) -> None:
+        """Stops tray icon and terminates the app completely."""
+        if self.tray_icon:
+            try:
+                self.tray_icon.stop()
+            except Exception:
+                pass
+        self.on_closing()
+
+    # --------------------------------------------------------------------------
+    # Commands Manager Tab
+    # --------------------------------------------------------------------------
+
     def _build_commands_tab(self) -> None:
-        """Builds the searchable and duplicatable command manager."""
-        # Action bar: Search + Category Filter + Add Button
         action_bar = ctk.CTkFrame(self.tab_commands, fg_color="transparent")
         action_bar.pack(fill="x", padx=12, pady=(12, 10))
 
-        # Search Box
+        # Search Box with Debounce
         self.search_entry = ctk.CTkEntry(
             action_bar,
-            placeholder_text="🔍 Search commands by trigger name or command line...",
+            placeholder_text="🔍 Search triggers, commands, or websites...",
+            width=280,
             height=36,
-            corner_radius=8,
-            fg_color="#0b0f19",
-            border_color="#2a3b53",
-            width=340,
+            fg_color=THEME_COLORS["input_bg"],
+            border_color=THEME_COLORS["input_border"],
+            text_color=THEME_COLORS["text_primary"],
         )
         self.search_entry.pack(side="left", padx=(0, 10))
         self.search_entry.bind("<KeyRelease>", self._on_search_changed)
 
-        # Category Filter Segmented Button
-        self.seg_filter = ctk.CTkSegmentedButton(
+        # Filter Segmented Button
+        self.filter_seg = ctk.CTkSegmentedButton(
             action_bar,
             values=["All", "Custom", "Built-In"],
             command=self._on_filter_changed,
             height=36,
+            selected_color="#2563eb",
+            unselected_color=THEME_COLORS["btn_secondary_bg"],
+            text_color=THEME_COLORS["text_primary"],
         )
-        self.seg_filter.set("All")
-        self.seg_filter.pack(side="left", padx=(0, 10))
+        self.filter_seg.set("All")
+        self.filter_seg.pack(side="left", padx=(0, 10))
 
-        # Add Command Button
-        add_btn = ctk.CTkButton(
+        # Create New Command Button
+        btn_add = ctk.CTkButton(
             action_bar,
             text="+ Create New Command",
-            font=ctk.CTkFont(weight="bold"),
-            fg_color="#06b6d4",
-            hover_color="#0891b2",
             height=36,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color="#2563eb",
+            hover_color="#1d4ed8",
             command=self._open_add_dialog,
         )
-        add_btn.pack(side="right")
+        btn_add.pack(side="right")
 
-        # Scrollable Commands Container
-        self.scroll_cmds = ctk.CTkScrollableFrame(self.tab_commands, fg_color="transparent")
+        # Scrollable list for command cards
+        self.scroll_cmds = ctk.CTkScrollableFrame(
+            self.tab_commands,
+            fg_color="transparent",
+            corner_radius=8,
+        )
         self.scroll_cmds.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
+        self._render_commands_list()
+
+    def _on_search_changed(self, event) -> None:
+        if self._search_debounce_id:
+            self.after_cancel(self._search_debounce_id)
+        self._search_debounce_id = self.after(150, self._apply_search)
+
+    def _apply_search(self) -> None:
+        self.search_filter = self.search_entry.get()
+        self._render_commands_list()
+
+    def _on_filter_changed(self, value: str) -> None:
+        self.category_filter = value
         self._render_commands_list()
 
     def _render_commands_list(self) -> None:
@@ -521,14 +795,14 @@ class WindowsAgentGUI(ctk.CTk):
                 self.scroll_cmds,
                 text=f"USER CUSTOM COMMANDS ({len(filtered_custom)})",
                 font=ctk.CTkFont(size=12, weight="bold"),
-                text_color="#38bdf8",
+                text_color="#0284c7",
             ).pack(anchor="w", padx=4, pady=(6, 8))
 
             if not filtered_custom:
                 ctk.CTkLabel(
                     self.scroll_cmds,
                     text="No custom commands match your filter. Click '+ Create New Command' to add one!",
-                    text_color="#64748b",
+                    text_color=THEME_COLORS["text_muted"],
                 ).pack(anchor="w", padx=12, pady=4)
             else:
                 for cmd in filtered_custom:
@@ -549,7 +823,7 @@ class WindowsAgentGUI(ctk.CTk):
                 self.scroll_cmds,
                 text=f"BUILT-IN SYSTEM COMMANDS ({len(filtered_builtin)})",
                 font=ctk.CTkFont(size=12, weight="bold"),
-                text_color="#94a3b8",
+                text_color=THEME_COLORS["text_secondary"],
             ).pack(anchor="w", padx=4, pady=(20, 8))
 
             for cmd_def in filtered_builtin:
@@ -564,13 +838,13 @@ class WindowsAgentGUI(ctk.CTk):
                 self._create_command_card(card_cmd, is_custom=False)
 
     def _create_command_card(self, cmd: CustomCommand, is_custom: bool) -> None:
-        """Renders an individual modern card for a command."""
+        """Constructs an individual command card with duplication, run, edit, and delete options."""
         card = ctk.CTkFrame(
             self.scroll_cmds,
             corner_radius=10,
-            fg_color="#0b0f19",
+            fg_color=THEME_COLORS["card_bg"],
             border_width=1,
-            border_color="#1f293d",
+            border_color=THEME_COLORS["card_border"],
         )
         card.pack(fill="x", pady=5, padx=2)
 
@@ -582,7 +856,6 @@ class WindowsAgentGUI(ctk.CTk):
         header_row = ctk.CTkFrame(left_side, fg_color="transparent")
         header_row.pack(anchor="w")
 
-        # Choose icon based on type
         is_url = cmd.command_line.startswith(("http://", "https://", "www."))
         icon = "🌐" if is_url else ("⚡" if is_custom else "🖥️")
         if "lock" in cmd.trigger_name:
@@ -592,18 +865,19 @@ class WindowsAgentGUI(ctk.CTk):
             header_row,
             text=f"{icon} \"{cmd.trigger_name}\"",
             font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
-            text_color="#f8fafc",
+            text_color=THEME_COLORS["text_primary"],
         ).pack(side="left", padx=(0, 10))
 
         badge_text = "CUSTOM" if is_custom else "BUILT-IN"
-        badge_bg = "#0284c7" if is_custom else "#334155"
+        badge_bg = "#0284c7" if is_custom else "#475569"
         ctk.CTkLabel(
             header_row,
             text=badge_text,
             font=ctk.CTkFont(size=10, weight="bold"),
             fg_color=badge_bg,
             corner_radius=6,
-            width=62,
+            text_color="#ffffff",
+            width=64,
             height=20,
         ).pack(side="left", padx=(0, 6))
 
@@ -612,21 +886,22 @@ class WindowsAgentGUI(ctk.CTk):
                 header_row,
                 text="⚠️ CONFIRMATION REQUIRED",
                 font=ctk.CTkFont(size=10, weight="bold"),
-                fg_color="#991b1b",
+                fg_color="#dc2626",
                 corner_radius=6,
-                width=160,
+                text_color="#ffffff",
+                width=165,
                 height=20,
             ).pack(side="left")
 
         # Command Code Box Preview
-        code_box = ctk.CTkFrame(left_side, corner_radius=6, fg_color="#151e2e")
+        code_box = ctk.CTkFrame(left_side, corner_radius=6, fg_color=THEME_COLORS["code_box_bg"])
         code_box.pack(anchor="w", fill="x", pady=(6, 2))
 
         ctk.CTkLabel(
             code_box,
             text=f"Runs: {cmd.command_line}",
             font=ctk.CTkFont(family="Consolas", size=12),
-            text_color="#38bdf8",
+            text_color=THEME_COLORS["code_box_text"],
             wraplength=640,
             justify="left",
         ).pack(anchor="w", padx=8, pady=4)
@@ -636,7 +911,7 @@ class WindowsAgentGUI(ctk.CTk):
                 left_side,
                 text=cmd.description,
                 font=ctk.CTkFont(size=12),
-                text_color="#94a3b8",
+                text_color=THEME_COLORS["text_secondary"],
             ).pack(anchor="w", pady=(2, 0))
 
         # Right Action Buttons
@@ -650,8 +925,8 @@ class WindowsAgentGUI(ctk.CTk):
             width=70,
             height=32,
             font=ctk.CTkFont(size=12, weight="bold"),
-            fg_color="#10b981",
-            hover_color="#059669",
+            fg_color="#059669",
+            hover_color="#047857",
             command=lambda t=cmd.trigger_name, c=is_custom: self._run_command_action(t, c),
         ).pack(side="left", padx=3)
 
@@ -659,11 +934,12 @@ class WindowsAgentGUI(ctk.CTk):
         ctk.CTkButton(
             actions_frame,
             text="📋 Duplicate",
-            width=86,
+            width=88,
             height=32,
             font=ctk.CTkFont(size=12),
-            fg_color="#1e293b",
-            hover_color="#334155",
+            fg_color="#0284c7",
+            hover_color="#0369a1",
+            text_color="#ffffff",
             command=lambda c=cmd, ic=is_custom: self._replicate_command_action(c, ic),
         ).pack(side="left", padx=3)
 
@@ -675,8 +951,9 @@ class WindowsAgentGUI(ctk.CTk):
                 width=65,
                 height=32,
                 font=ctk.CTkFont(size=12),
-                fg_color="#334155",
-                hover_color="#475569",
+                fg_color=THEME_COLORS["btn_secondary_bg"],
+                hover_color=THEME_COLORS["btn_secondary_hover"],
+                text_color=THEME_COLORS["btn_secondary_text"],
                 command=lambda c=cmd: self._open_edit_dialog(c),
             ).pack(side="left", padx=3)
 
@@ -686,24 +963,21 @@ class WindowsAgentGUI(ctk.CTk):
                 text="🗑️",
                 width=36,
                 height=32,
-                fg_color="#7f1d1d",
-                hover_color="#991b1b",
+                fg_color="#dc2626",
+                hover_color="#b91c1c",
                 command=lambda t=cmd.trigger_name: self._delete_command_action(t),
             ).pack(side="left", padx=3)
-
-    def _on_search_changed(self, event) -> None:
-        self.search_filter = self.search_entry.get()
-        self._render_commands_list()
-
-    def _on_filter_changed(self, value: str) -> None:
-        self.category_filter = value
-        self._render_commands_list()
 
     def _open_add_dialog(self) -> None:
         AddEditCommandDialog(self, on_save_callback=self._handle_save_command)
 
     def _open_edit_dialog(self, cmd: CustomCommand) -> None:
-        AddEditCommandDialog(self, on_save_callback=self._handle_save_command, command_to_edit=cmd, is_replication=False)
+        AddEditCommandDialog(
+            self,
+            on_save_callback=self._handle_save_command,
+            command_to_edit=cmd,
+            is_replication=False,
+        )
 
     def _replicate_command_action(self, cmd: CustomCommand, is_custom: bool) -> None:
         """Replicates any command so user can customize the URL or command line and save as new!"""
@@ -715,7 +989,6 @@ class WindowsAgentGUI(ctk.CTk):
                 confirmation_required=cmd.confirmation_required,
             )
         else:
-            # Replicating built-in command
             template_info = BUILTIN_DUPLICATE_TEMPLATES.get(cmd.trigger_name, {
                 "trigger_name": f"my_{cmd.trigger_name}",
                 "command_line": cmd.command_line,
@@ -729,7 +1002,12 @@ class WindowsAgentGUI(ctk.CTk):
                 confirmation_required=template_info["confirmation_required"],
             )
 
-        AddEditCommandDialog(self, on_save_callback=self._handle_save_command, command_to_edit=template_cmd, is_replication=True)
+        AddEditCommandDialog(
+            self,
+            on_save_callback=self._handle_save_command,
+            command_to_edit=template_cmd,
+            is_replication=True,
+        )
 
     def _handle_save_command(
         self, trigger: str, cmd_line: str, desc: str, confirm: bool, is_edit: bool
@@ -773,7 +1051,6 @@ class WindowsAgentGUI(ctk.CTk):
     def _toggle_local_broker(self) -> None:
         """Starts or stops the embedded FastAPI broker locally on port 8000."""
         if self.local_broker_server is not None:
-            # Stop local broker
             self.local_broker_server.should_exit = True
             self.local_broker_server = None
             self.btn_local_broker.configure(
@@ -784,7 +1061,6 @@ class WindowsAgentGUI(ctk.CTk):
             self._log_message("Local Cloud Broker stopped.")
             return
 
-        # Start local broker
         try:
             import uvicorn
             from cloud.app import app
@@ -820,7 +1096,7 @@ class WindowsAgentGUI(ctk.CTk):
             top_bar,
             text="Real-time execution telemetry of voice invocations and GUI actions.",
             font=ctk.CTkFont(size=12),
-            text_color="#94a3b8",
+            text_color=THEME_COLORS["text_secondary"],
         ).pack(side="left")
 
         clear_btn = ctk.CTkButton(
@@ -828,8 +1104,9 @@ class WindowsAgentGUI(ctk.CTk):
             text="Clear Logs",
             width=90,
             height=30,
-            fg_color="#1e293b",
-            hover_color="#334155",
+            fg_color=THEME_COLORS["btn_secondary_bg"],
+            hover_color=THEME_COLORS["btn_secondary_hover"],
+            text_color=THEME_COLORS["btn_secondary_text"],
             command=self._clear_logs,
         )
         clear_btn.pack(side="right")
@@ -837,13 +1114,13 @@ class WindowsAgentGUI(ctk.CTk):
         self.log_textbox = ctk.CTkTextbox(
             self.tab_logs,
             font=ctk.CTkFont(family="Consolas", size=12),
-            fg_color="#0b0f19",
-            text_color="#f8fafc",
+            fg_color=THEME_COLORS["console_bg"],
+            text_color=THEME_COLORS["console_text"],
             border_width=1,
-            border_color="#1f293d",
+            border_color=THEME_COLORS["card_border"],
         )
         self.log_textbox.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-        self._log_message("Alexa Windows Agent Desktop initialized.")
+        self._log_message("Alexa Windows Controller desktop initialized.")
 
     def _log_message(self, text: str) -> None:
         timestamp = time.strftime("%H:%M:%S")
@@ -854,7 +1131,7 @@ class WindowsAgentGUI(ctk.CTk):
         self.log_textbox.delete("1.0", tk.END)
 
     # --------------------------------------------------------------------------
-    # Settings Tab
+    # Settings & Endpoints Tab
     # --------------------------------------------------------------------------
 
     def _build_settings_tab(self) -> None:
@@ -862,21 +1139,27 @@ class WindowsAgentGUI(ctk.CTk):
         scroll.pack(fill="both", expand=True, padx=20, pady=16)
 
         # 1. Broker Connection & Tunnel Manager Card
-        broker_card = ctk.CTkFrame(scroll, fg_color="#0b0f19", corner_radius=10, border_width=1, border_color="#1f293d")
+        broker_card = ctk.CTkFrame(
+            scroll,
+            fg_color=THEME_COLORS["card_bg"],
+            corner_radius=10,
+            border_width=1,
+            border_color=THEME_COLORS["card_border"],
+        )
         broker_card.pack(fill="x", pady=(0, 16))
 
         ctk.CTkLabel(
             broker_card,
             text="📡 Cloud Broker & Tunnel Configuration",
             font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
-            text_color="#f8fafc",
+            text_color=THEME_COLORS["brand_title"],
         ).pack(anchor="w", padx=16, pady=(14, 6))
 
         ctk.CTkLabel(
             broker_card,
-            text="Connect directly via Localhost (http://localhost:8000) or enter your Cloudflare Tunnel URL (https://xxxx.trycloudflare.com).",
+            text="Connect directly via Localhost (http://localhost:8000) or enter your Cloudflare Tunnel / Cloud URL (https://xxxx.trycloudflare.com or https://your-broker.onrender.com).",
             font=ctk.CTkFont(size=12),
-            text_color="#94a3b8",
+            text_color=THEME_COLORS["text_secondary"],
             wraplength=640,
             justify="left",
         ).pack(anchor="w", padx=16, pady=(0, 12))
@@ -889,8 +1172,9 @@ class WindowsAgentGUI(ctk.CTk):
             url_row,
             placeholder_text="e.g. http://localhost:8000 or https://your-tunnel.trycloudflare.com",
             font=ctk.CTkFont(size=13),
-            fg_color="#151e2e",
-            border_color="#2563eb",
+            fg_color=THEME_COLORS["input_bg"],
+            border_color=THEME_COLORS["input_border"],
+            text_color=THEME_COLORS["text_primary"],
             height=36,
         )
         self.entry_broker_url.insert(0, self.config.broker_api_url)
@@ -911,41 +1195,54 @@ class WindowsAgentGUI(ctk.CTk):
             url_row,
             text="Reset to Localhost",
             font=ctk.CTkFont(size=12),
-            fg_color="#1e293b",
-            hover_color="#334155",
+            fg_color=THEME_COLORS["btn_secondary_bg"],
+            hover_color=THEME_COLORS["btn_secondary_hover"],
+            text_color=THEME_COLORS["btn_secondary_text"],
             height=36,
             command=self._reset_broker_to_localhost,
         )
         btn_reset_local.pack(side="left")
 
         # 2. Alexa Skill Webhook Endpoint Card
-        alexa_card = ctk.CTkFrame(scroll, fg_color="#0b0f19", corner_radius=10, border_width=1, border_color="#1f293d")
+        alexa_card = ctk.CTkFrame(
+            scroll,
+            fg_color=THEME_COLORS["card_bg"],
+            corner_radius=10,
+            border_width=1,
+            border_color=THEME_COLORS["card_border"],
+        )
         alexa_card.pack(fill="x", pady=(0, 16))
 
         ctk.CTkLabel(
             alexa_card,
             text="🎙️ Alexa Developer Console Webhook Endpoint",
             font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
-            text_color="#f8fafc",
+            text_color=THEME_COLORS["brand_title"],
         ).pack(anchor="w", padx=16, pady=(14, 4))
 
         ctk.CTkLabel(
             alexa_card,
             text="Copy this HTTPS URL and paste it into the Alexa Developer Console under 'Endpoint > HTTPS > Default Region':",
             font=ctk.CTkFont(size=12),
-            text_color="#94a3b8",
+            text_color=THEME_COLORS["text_secondary"],
             wraplength=640,
             justify="left",
         ).pack(anchor="w", padx=16, pady=(0, 10))
 
-        endpoint_row = ctk.CTkFrame(alexa_card, fg_color="#151e2e", corner_radius=8, border_width=1, border_color="#2563eb")
+        endpoint_row = ctk.CTkFrame(
+            alexa_card,
+            fg_color=THEME_COLORS["code_box_bg"],
+            corner_radius=8,
+            border_width=1,
+            border_color=THEME_COLORS["input_border"],
+        )
         endpoint_row.pack(fill="x", padx=16, pady=(0, 14))
 
         self.lbl_alexa_webhook = ctk.CTkLabel(
             endpoint_row,
             text=f"{self.config.broker_api_url.rstrip('/')}/alexa",
             font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
-            text_color="#38bdf8",
+            text_color="#0284c7",
             anchor="w",
         )
         self.lbl_alexa_webhook.pack(side="left", padx=14, pady=10, fill="x", expand=True)
@@ -963,14 +1260,20 @@ class WindowsAgentGUI(ctk.CTk):
         btn_copy_endpoint.pack(side="right", padx=10, pady=6)
 
         # 3. System & Agent Configuration Details
-        details_card = ctk.CTkFrame(scroll, fg_color="#0b0f19", corner_radius=10, border_width=1, border_color="#1f293d")
+        details_card = ctk.CTkFrame(
+            scroll,
+            fg_color=THEME_COLORS["card_bg"],
+            corner_radius=10,
+            border_width=1,
+            border_color=THEME_COLORS["card_border"],
+        )
         details_card.pack(fill="x", pady=(0, 16))
 
         ctk.CTkLabel(
             details_card,
             text="⚙️ Agent Environment & Runtime Settings",
             font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
-            text_color="#f8fafc",
+            text_color=THEME_COLORS["brand_title"],
         ).pack(anchor="w", padx=16, pady=(14, 10))
 
         settings = [
@@ -983,13 +1286,14 @@ class WindowsAgentGUI(ctk.CTk):
         ]
 
         for label, val in settings:
-            row = ctk.CTkFrame(details_card, fg_color="#151e2e", corner_radius=6)
+            row = ctk.CTkFrame(details_card, fg_color=THEME_COLORS["row_bg"], corner_radius=6)
             row.pack(fill="x", padx=16, pady=3)
             ctk.CTkLabel(
-                row, text=f"{label}:", font=ctk.CTkFont(weight="bold", size=12), width=180, anchor="w"
+                row, text=f"{label}:", font=ctk.CTkFont(weight="bold", size=12), width=180, anchor="w",
+                text_color=THEME_COLORS["text_primary"]
             ).pack(side="left", padx=12, pady=8)
             ctk.CTkLabel(
-                row, text=str(val), text_color="#38bdf8", anchor="w", font=ctk.CTkFont(size=12)
+                row, text=str(val), text_color="#0284c7", anchor="w", font=ctk.CTkFont(size=12)
             ).pack(side="left", padx=12, pady=8)
 
     def _apply_broker_url(self) -> None:
@@ -1019,7 +1323,6 @@ class WindowsAgentGUI(ctk.CTk):
         self.lbl_broker_url.configure(text=f"📡 Broker: {api_url}")
         self.lbl_alexa_webhook.configure(text=f"{api_url}/alexa")
 
-        # Disconnect current connection so background loop reconnects with new URL immediately
         if self.bg_loop and self.bg_loop.is_running() and self.api_client.ws_connection:
             try:
                 asyncio.run_coroutine_threadsafe(self.api_client.ws_connection.close(), self.bg_loop)
@@ -1107,6 +1410,7 @@ class WindowsAgentGUI(ctk.CTk):
         self.after(1000, self._start_periodic_ui_refresh)
 
     def on_closing(self) -> None:
+        """Shuts down local server, background client, and destroys window."""
         if self.local_broker_server is not None:
             self.local_broker_server.should_exit = True
         self.api_client.stop()
@@ -1115,9 +1419,54 @@ class WindowsAgentGUI(ctk.CTk):
         self.destroy()
 
 
-def launch_gui() -> None:
-    app = WindowsAgentGUI()
-    app.protocol("WM_DELETE_WINDOW", app.on_closing)
+# ------------------------------------------------------------------------------
+# Single-Instance Activation & Launcher
+# ------------------------------------------------------------------------------
+
+def notify_existing_instance() -> bool:
+    """If an existing instance is running, sends activation signal and returns True."""
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.3)
+        s.connect(('127.0.0.1', SINGLE_INSTANCE_PORT))
+        s.sendall(b"SHOW\n")
+        s.close()
+        return True
+    except (ConnectionRefusedError, OSError, socket.timeout):
+        return False
+
+
+def start_single_instance_listener(app_ref: WindowsAgentGUI) -> None:
+    """Listens on localhost port for activation signals from future launches."""
+    import socket
+
+    def listener():
+        try:
+            srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            srv.bind(('127.0.0.1', SINGLE_INSTANCE_PORT))
+            srv.listen(5)
+            while True:
+                conn, _ = srv.accept()
+                data = conn.recv(64)
+                if b"SHOW" in data:
+                    app_ref.after(0, app_ref._show_window)
+                conn.close()
+        except Exception:
+            pass
+
+    t = threading.Thread(target=listener, daemon=True)
+    t.start()
+
+
+def launch_gui(start_minimized: bool = False) -> None:
+    if notify_existing_instance():
+        logger.info("Application is already running in background. Brought existing window to front.")
+        return
+
+    app = WindowsAgentGUI(start_minimized=start_minimized)
+    start_single_instance_listener(app)
     app.mainloop()
 
 
