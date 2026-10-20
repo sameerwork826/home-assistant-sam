@@ -1,0 +1,180 @@
+{
+  "launch_request": {
+    "version": "1.0",
+    "session": {
+      "new": true,
+      "sessionId": "amzn1.echo-api.session.test-session-1234",
+      "application": {
+        "applicationId": "amzn1.ask.skill.test-skill-id"
+      },
+      "attributes": {},
+      "user": {
+        "userId": "amzn1.ask.account.test-user-id"
+      }
+    },
+    "request": {
+      "type": "LaunchRequest",
+      "requestId": "amzn1.echo-api.request.launch-123",
+      "timestamp": "2026-10-20T14:00:00Z",
+      "locale": "en-US"
+    }
+  },
+  "open_chrome_intent": {
+    "version": "1.0",
+    "session": {
+      "new": false,
+      "sessionId": "amzn1.echo-api.session.test-session-1234",
+      "application": {
+        "applicationId": "amzn1.ask.skill.test-skill-id"
+      },
+      "attributes": {},
+      "user": {
+        "userId": "amzn1.ask.account.test-user-id"
+      }
+    },
+    "request": {
+      "type": "IntentRequest",
+      "requestId": "amzn1.echo-api.request.intent-chrome-123",
+      "timestamp": "2026-10-20T14:00:00Z",
+      "locale": "en-US",
+      "intent": {
+        "name": "OpenChromeIntent",
+        "confirmationStatus": "NONE",
+        "slots": {}
+      }
+    }
+  },
+  "lock_pc_intent": {
+    "version": "1.0",
+    "session": {
+      "new": false,
+      "sessionId": "amzn1.echo-api.session.test-session-1234",
+      "application": {
+        "applicationId": "amzn1.ask.skill.test-skill-id"
+      },
+      "attributes": {},
+      "user": {
+        "userId": "amzn1.ask.account.test-user-id"
+      }
+    },
+    "request": {
+      "type": "IntentRequest",
+      "requestId": "amzn1.echo-api.request.intent-lock-123",
+      "timestamp": "2026-10-20T14:00:00Z",
+      "locale": "en-US",
+      "intent": {
+        "name": "LockPCIntent",
+        "confirmationStatus": "NONE",
+        "slots": {}
+      }
+    }
+  },
+  "open_website_intent": {
+    "version": "1.0",
+    "session": {
+      "new": false,
+      "sessionId": "amzn1.echo-api.session.test-session-1234",
+      "application": {
+        "applicationId": "amzn1.ask.skill.test-skill-id"
+      },
+      "attributes": {},
+      "user": {
+        "userId": "amzn1.ask.account.test-user-id"
+      }
+    },
+    "request": {
+      "type": "IntentRequest",
+      "requestId": "amzn1.echo-api.request.intent-website-123",
+      "timestamp": "2026-10-20T14:00:00Z",
+      "locale": "en-US",
+      "intent": {
+        "name": "OpenWebsiteIntent",
+        "confirmationStatus": "NONE",
+        "slots": {
+          "WebsiteName": {
+            "name": "WebsiteName",
+            "value": "youtube",
+            "confirmationStatus": "NONE"
+          }
+        }
+      }
+    }
+  },
+  "pc_status_intent": {
+    "version": "1.0",
+    "session": {
+      "new": false,
+      "sessionId": "amzn1.echo-api.session.test-session-1234",
+      "application": {
+        "applicationId": "amzn1.ask.skill.test-skill-id"
+      },
+      "attributes": {},
+      "user": {
+        "userId": "amzn1.ask.account.test-user-id"
+      }
+    },
+    "request": {
+      "type": "IntentRequest",
+      "requestId": "amzn1.echo-api.request.intent-status-123",
+      "timestamp": "2026-10-20T14:00:00Z",
+      "locale": "en-US",
+      "intent": {
+        "name": "PCStatusIntent",
+        "confirmationStatus": "NONE",
+        "slots": {}
+      }
+    }
+  },
+  "shutdown_pc_intent_unconfirmed": {
+    "version": "1.0",
+    "session": {
+      "new": false,
+      "sessionId": "amzn1.echo-api.session.test-session-1234",
+      "application": {
+        "applicationId": "amzn1.ask.skill.test-skill-id"
+      },
+      "attributes": {},
+      "user": {
+        "userId": "amzn1.ask.account.test-user-id"
+      }
+    },
+    "request": {
+      "type": "IntentRequest",
+      "requestId": "amzn1.echo-api.request.intent-shutdown-123",
+      "timestamp": "2026-10-20T14:00:00Z",
+      "locale": "en-US",
+      "intent": {
+        "name": "ShutdownPCIntent",
+        "confirmationStatus": "NONE",
+        "slots": {}
+      }
+    }
+  },
+  "confirm_action_intent": {
+    "version": "1.0",
+    "session": {
+      "new": false,
+      "sessionId": "amzn1.echo-api.session.test-session-1234",
+      "application": {
+        "applicationId": "amzn1.ask.skill.test-skill-id"
+      },
+      "attributes": {
+        "pending_action": "shutdown_pc"
+      },
+      "user": {
+        "userId": "amzn1.ask.account.test-user-id"
+      }
+    },
+    "request": {
+      "type": "IntentRequest",
+      "requestId": "amzn1.echo-api.request.intent-confirm-123",
+      "timestamp": "2026-10-20T14:00:00Z",
+      "locale": "en-US",
+      "intent": {
+        "name": "ConfirmActionIntent",
+        "confirmationStatus": "NONE",
+        "slots": {}
+      }
+    }
+  }
+}

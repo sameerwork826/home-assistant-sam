@@ -1,0 +1,234 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "my pc",
+      "types": [
+        {
+          "name": "PREDEFINED_WEBSITE_TYPE",
+          "values": [
+            {
+              "id": "google",
+              "name": {
+                "value": "google",
+                "synonyms": ["google search", "the search engine", "google dot com"]
+              }
+            },
+            {
+              "id": "youtube",
+              "name": {
+                "value": "youtube",
+                "synonyms": ["you tube", "video site", "youtube dot com"]
+              }
+            },
+            {
+              "id": "github",
+              "name": {
+                "value": "github",
+                "synonyms": ["git hub", "git", "github dot com"]
+              }
+            },
+            {
+              "id": "reddit",
+              "name": {
+                "value": "reddit",
+                "synonyms": ["the front page", "reddit dot com"]
+              }
+            },
+            {
+              "id": "chatgpt",
+              "name": {
+                "value": "chatgpt",
+                "synonyms": ["chat gpt", "openai", "chat gpt dot com"]
+              }
+            }
+          ]
+        }
+      ],
+      "intents": [
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.YesIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NoIntent",
+          "samples": []
+        },
+        {
+          "name": "OpenChromeIntent",
+          "slots": [],
+          "samples": [
+            "open Chrome",
+            "launch Chrome",
+            "start Chrome",
+            "open Google Chrome",
+            "launch Google Chrome",
+            "start Google Chrome",
+            "open Chrome on my computer",
+            "launch Chrome on my laptop",
+            "open my browser"
+          ]
+        },
+        {
+          "name": "OpenVSCodeIntent",
+          "slots": [],
+          "samples": [
+            "open VS Code",
+            "launch VS Code",
+            "start VS Code",
+            "open Visual Studio Code",
+            "launch Visual Studio Code",
+            "start Visual Studio Code",
+            "open VS Code on my computer",
+            "open my code editor"
+          ]
+        },
+        {
+          "name": "OpenWebsiteIntent",
+          "slots": [
+            {
+              "name": "WebsiteName",
+              "type": "PREDEFINED_WEBSITE_TYPE"
+            }
+          ],
+          "samples": [
+            "open {WebsiteName}",
+            "open website {WebsiteName}",
+            "launch {WebsiteName}",
+            "open the website {WebsiteName}",
+            "go to {WebsiteName}",
+            "navigate to {WebsiteName}"
+          ]
+        },
+        {
+          "name": "LockPCIntent",
+          "slots": [],
+          "samples": [
+            "lock my computer",
+            "lock the PC",
+            "lock the computer",
+            "lock the screen",
+            "lock Windows",
+            "lock my laptop"
+          ]
+        },
+        {
+          "name": "ShutdownPCIntent",
+          "slots": [],
+          "samples": [
+            "shut down my computer",
+            "turn off my computer",
+            "power off my PC",
+            "shut down the PC",
+            "shut down Windows",
+            "power down my laptop"
+          ]
+        },
+        {
+          "name": "RestartPCIntent",
+          "slots": [],
+          "samples": [
+            "restart my computer",
+            "reboot my computer",
+            "restart the PC",
+            "reboot Windows",
+            "restart Windows",
+            "reboot my laptop"
+          ]
+        },
+        {
+          "name": "SleepPCIntent",
+          "slots": [],
+          "samples": [
+            "put the computer to sleep",
+            "put my PC to sleep",
+            "sleep computer",
+            "suspend my PC",
+            "sleep the PC",
+            "put Windows to sleep"
+          ]
+        },
+        {
+          "name": "CancelShutdownIntent",
+          "slots": [],
+          "samples": [
+            "cancel shutdown",
+            "abort shutdown",
+            "stop the shutdown",
+            "cancel the restart",
+            "don't shut down",
+            "abort the restart"
+          ]
+        },
+        {
+          "name": "PCStatusIntent",
+          "slots": [],
+          "samples": [
+            "check my PC",
+            "is my computer online",
+            "check computer status",
+            "PC status",
+            "is my laptop connected",
+            "check laptop status",
+            "what is the computer status"
+          ]
+        },
+        {
+          "name": "CommandStatusIntent",
+          "slots": [],
+          "samples": [
+            "check last command",
+            "did the command succeed",
+            "what was the last command result",
+            "status of last command",
+            "did that work"
+          ]
+        },
+        {
+          "name": "ConfirmActionIntent",
+          "slots": [],
+          "samples": [
+            "confirm",
+            "proceed",
+            "do it",
+            "yes please",
+            "confirm action",
+            "yes shut down",
+            "yes restart"
+          ]
+        },
+        {
+          "name": "CancelActionIntent",
+          "slots": [],
+          "samples": [
+            "cancel action",
+            "don't do it",
+            "abort action",
+            "never mind",
+            "no thanks",
+            "stop action"
+          ]
+        }
+      ]
+    }
+  }
+}
